@@ -2,14 +2,14 @@
 [![Build Status](https://img.shields.io/github/workflow/status/sondregronas/EduGameDist/CI)](https://github.com/sondregronas/EduGameDist/)
 [![GitHub latest commit](https://img.shields.io/github/last-commit/sondregronas/EduGameDist)](https://github.com/sondregronas/EduGameDist/commit/)
 
-A containerized web based game distribution solution for educational settings. Requires access to the schools local network in order to work. You should never expose this to the internet, as it is illegal to distribute games without permission. Ensure only local devices and students have access to the server.
+A containerized web based game distribution solution for educational settings. Requires local network access to function. You should never expose this to the internet, as it is illegal to distribute games without permission. Ensure only local devices and legible students have access to the server.
 
 Note: Parts of this project is in Norwegian, as it was made for a Norwegian school, you can change this by editing the `.pug` files in the `views` folder by uncommenting the volume mount in the `docker-compose.yml` file.
 
 ## What is this?
 Traditionally games have been distributed on physical media. This is a problem for schools, as they have to buy a lot of physical media, and it is hard to keep track of who has what. This project aims to solve this problem by providing a way to distribute games over a local network.
 
-For information on how to get access to distribution friendly games, see [this article by spillpedagogene (Norwegian)](https://www.spillpedagogbanken.no/?faq=hva-er-steam-epic-itch-io-gog-og-humblebundle).
+For information on how to get access to distribution friendly games, see [this article by spillpedagogbanken (Norwegian)](https://www.spillpedagogbanken.no/?faq=hva-er-steam-epic-itch-io-gog-og-humblebundle).
 
 ## Setup
 Runs on [Docker](https://www.docker.com/).
@@ -82,9 +82,13 @@ I recommend only giving access to the `Friendly` view to those who need access, 
 Use in conjunction with [NginxProxyManager](https://nginxproxymanager.com/) to get a nice URL for both the frontend and database. Be sure to restrict access to the server to only your local network for the frontend, as games will be accessible from the frontend.
 
 ## Development
-Clone the repo and set your working directory to `src`.<br>
-Install dependencies using `npm i`.<br>
-The dev-mode can be activated by running `npm run dev`, which will automatically refresh the server when changes are made.<br>
+Improvements are very welcome, feel free to open a pull request or issue.
+
+Clone the repo and set your working directory to `src`.
+
+Install dependencies using `npm i`.
+
+The dev-mode can be activated by running `npm run dev`, which will automatically refresh the server when changes are made.
 
 ## License
 This project is licensed under the MIT License - see the [LICENSE](LICENSE) file for details

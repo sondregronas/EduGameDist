@@ -55,10 +55,11 @@ function serializeDB(db_file) {
           "Mac_dl TEXT," +
           "Linux_dl TEXT," +
           "Android_dl TEXT," +
-          "Steam TEXT," +
-          "Humblebundle TEXT," +
-          "Gog TEXT," +
-          "Itchio TEXT)")
+          "Store1 TEXT," +
+          "Store2 TEXT," +
+          "Store3 TEXT," +
+          "Store4 TEXT," +
+          "Store5 TEXT)")
     });
     db.close()
 }
@@ -100,10 +101,11 @@ function getGameList(db_file) {
 
       // Links
       o[key]["links"] = []
-      if (row.Steam) {o[key]["links"].push(row.Steam)}
-      if (row.Gog) {o[key]["links"].push(row.Gog)}
-      if (row.Itchio) {o[key]["links"].push(row.Itchio)}
-      if (row.Humblebundle) {o[key]["links"].push(row.Humblebundle)}
+      if (row.Store1) {o[key]["links"].push(row.Store1)}
+      if (row.Store2) {o[key]["links"].push(row.Store2)}
+      if (row.Store3) {o[key]["links"].push(row.Store3)}
+      if (row.Store4) {o[key]["links"].push(row.Store4)}
+      if (row.Store5) {o[key]["links"].push(row.Store5)}
       })
     });
   db.close()

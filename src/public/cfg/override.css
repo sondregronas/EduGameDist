@@ -21,7 +21,7 @@
   --primary-bg-color: #3b5791;
   --secondary-bg-color: var(--color-primary-light);
   --mobile-bg-color: var(--color-secondary-dark);
-  /* Material Design blacks */
+
   --dark: #222;
 }
 

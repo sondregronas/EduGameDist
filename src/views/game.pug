@@ -13,54 +13,47 @@ block content
       p.game-description=gameData['description']
       p.game-note!=gameData['note']
       if (gameData['players'])
-          p.game-players <i class="players-icon mdi mdi-account"></i><span> </span>
+        if gameData['players'] === "1"
+          p.game-players <i class="mdi mdi-account"></i>
             span=gameData['players']
-            span  player
+            span=` spiller`
+        else
+          p.game-players <i class="mdi mdi-account-group" style="padding-right: 2px;"></i>
+            span=gameData['players']
+            span=` spillere`
       if (gameData['ttb'])
           p.game-ttb <i class="ttb-icon mdi mdi-clock-outline"></i><span> </span>
             span=gameData['ttb']
     #game-download-area
       #game-download-container
         if gameData.win_dl
-          a.download-button.dl-win(href=gameData.win_dl)
-            | Windows <i class="mdi mdi-microsoft-windows"></i>
+          a.download-button(href=gameData.win_dl) Windows <i class="mdi mdi-microsoft-windows"></i>
         if gameData.mac_dl
-          a.download-button.dl-mac(href=gameData.mac_dl)
-            | Mac <i class="mdi mdi-apple"></i>
+          a.download-button(href=gameData.mac_dl) Mac <i class="mdi mdi-apple"></i>
         if gameData.linux_dl
-          a.download-button.dl-linux(href=gameData.linux_dl)
-            | Linux <i class="mdi mdi-linux"></i>
+          a.download-button(href=gameData.linux_dl) Linux <i class="mdi mdi-linux"></i>
         if gameData.android_dl
-          a.download-button.dl-android(href=gameData.android_dl) 
-            | Android <i class="mdi mdi-android"></i>
+          a.download-button(href=gameData.android_dl) Android <i class="mdi mdi-android"></i>
         if gameData.url
-          a.download-button.dl-url(href=gameData.url)
-            | Nettleser <i class="mdi mdi-web"></i>
+          a.download-button(href=gameData.url) Nettleser <i class="mdi mdi-web"></i>
     #game-footer
-      p Spillene er lisensiert eller gitt til oss av utviklerne og skal ikke deles med andre enn elever på skolen.
+      p Spillene kan ikke deles med andre eller forlate klasserommet.
       if gameData['links'][0]
         p Du kan kjøpe spillet selv på en av følgende plattformer:
         #game-purchase-links
           // Tegn lenker utifra leverandør
           each link in gameData['links']
             if (link.includes('steampowered.com'))
-              a.game-link.game-link-steam(href=link target="_blank")
-                i.mdi.mdi-steam
+              a.game-link(href=link target="_blank") <i class="mdi mdi-steam"></i>
             if (link.includes('humblebundle.com'))
-              a.game-link.game-link-humblebundle(href=link target="_blank")
-                i.mdi.mdi-humble-bundle
+              a.game-link(href=link target="_blank") <i class="mdi mdi-humble-bundle"></i>
             if (link.includes('gog.com'))
-              a.game-link.game-link-steam(href=link target="_blank")
-                i.mdi.mdi-gog
+              a.game-link(href=link target="_blank") <i class="mdi mdi-gog"></i>
             if (link.includes('nintendo.com'))
-              a.game-link.game-link-nintendo(href=link target="_blank")
-                i.mdi.mdi-nintendo-switch
+              a.game-link(href=link target="_blank") <i class="mdi mdi-nintendo-switch"></i>
             if (link.includes('apple.com'))
-              a.game-link.game-link-iphone(href=link target="_blank")
-                i.mdi.mdi-apple-ios
+              a.game-link(href=link target="_blank") <i class="mdi mdi-apple-ios"></i>
             if (link.includes('play.google.com'))
-              a.game-link.game-link-android(href=link target="_blank")
-                i.mdi.mdi-google-play
+              a.game-link(href=link target="_blank") <i class="mdi mdi-google-play"></i>
             if (link.includes('itch.io'))
-              a.game-link.game-link-itchio(href=link target="_blank")
-                i.fab.fa-itch-io
+              a.game-link(href=link target="_blank") <i class="fab fa-itch-io"></i>
