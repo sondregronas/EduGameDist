@@ -11,30 +11,10 @@ Traditionally games have been distributed on physical media. This is a problem f
 
 For information on how to get access to distribution friendly games, see [this article by spillpedagogene (Norwegian)](https://www.spillpedagogbanken.no/?faq=hva-er-steam-epic-itch-io-gog-og-humblebundle).
 
-## Usage
-Default username: `admin@change.me`
-Default password: `changeme`
-
-Frontend url: `localhost`
-Database url: `localhost:8080`
-
-Be sure to create a new superuser and change the password.
-
-A few folders should appear when you first run the `docker-compose.yml` file. `games` is where you will put your game installers / binaries in their respective platform folders. It is recommended to wrap all games in `.zip` archives. You can leave `db` alone, this is accessed via the database platform. `cfg` includes a few files you can modify to personalize your site.
-
-The project is preconfigured with 3 different views for NocoDB (`localhost:8080`): 
-- `Games` (Grid)
-- `Friendly` (Gallery view) 
-- `New entry` (Form)
-
-![img](assets/form.png)
-
-The `New entry` form can be used to add new games to the database. The `Friendly` view allows for changing relevant metadata only.
-
-I recommend only giving access to the `Friendly` view to those who need access, as the hidden values seldom need modification.
-
 ## Setup
-Create a `docker-compose.yml`:
+Runs on [Docker](https://www.docker.com/).
+
+Create a `docker-compose.yml`, or download the [docker-compose.yml](docker-compose.yml) file:
 ```yaml
 version: "3.3"
 services:
@@ -44,6 +24,7 @@ services:
     ports:
       - "80:80"
     volumes:
+      # Note, you can also bind any folder to a network share or different directories
       - ./games:/app/public/games
       - ./cfg:/app/public/cfg
       - ./db:/app/db
@@ -68,6 +49,30 @@ services:
 ```
 
 Run using `docker-compose up -d`. A few folders should appear.
+
+## Usage
+Navigate to the URLs hosted by docker:
+- Frontend url: `localhost`<br>
+- Database url: `localhost:8080`
+
+You can login to the database page using the following credentials:
+- Default username: `admin@change.me`<br>
+- Default password: `changeme`
+
+Be sure to create your own superuser and change the password.
+
+The `cfg` folder includes a few files you can modify to personalize your site. `games` is where you will put your game installers / binaries in their respective platform folders. It is recommended to store all games in their respective `.zip` archives.
+
+The database comes preconfigured with 3 different views in NocoDB (`localhost:8080`): 
+- `Games` (Grid)
+- `Friendly` (Gallery view)
+- `New entry` (Form)
+
+![img](assets/form.png)
+
+The `New entry` form can be used to add new games to the database. The `Friendly` view allows for changing relevant metadata only.
+
+I recommend only giving access to the `Friendly` view to those who need access, as the hidden values seldom need modification.
 
 ## Recommended setup
 Use in conjunction with [NginxProxyManager](https://nginxproxymanager.com/) to get a nice URL for both the frontend and database. Be sure to restrict access to the server to only your local network for the frontend, as games will be accessible from the frontend.

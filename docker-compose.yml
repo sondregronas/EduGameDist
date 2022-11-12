@@ -6,6 +6,7 @@ services:
     ports:
       - "80:80"
     volumes:
+      # Note, you can also bind any folder to a network share or different directories
       - ./games:/app/public/games
       - ./cfg:/app/public/cfg
       - ./db:/app/db
