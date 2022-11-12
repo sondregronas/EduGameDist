@@ -34,7 +34,7 @@ Create a `docker-compose.yml`:
 version: "3.3"
 services:
   frontend:
-    image: ghcr.io/vaagenim/spill.iktim.no
+    image: ghcr.io/sondregronas/edugamedist
     restart: unless-stopped
     ports:
       - "80:80"
