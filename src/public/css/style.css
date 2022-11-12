@@ -8,7 +8,6 @@ html, body {
 body {
   background-color: var(--secondary-bg-color);
   background-image: radial-gradient(circle, var(--primary-bg-color) 0%, var(--secondary-bg-color) 100%);
-  color: white;
 }
 
 #grid-center {
@@ -18,11 +17,6 @@ body {
   grid-template-columns: 1fr 8fr 1fr;
   justify-content: center;
   align-items: center;
-  pointer-events: none;
-}
-
-#grid-center * {
-  pointer-events: auto;
 }
 
 #grid-center-content {
@@ -49,39 +43,11 @@ footer * {
 }
 
 footer a {
-  color: var(--color-ff-link);
-  font-style: italic;
   transition: all 0.2s ease;
 }
 
 footer a:hover {
   color: var(--color-ff-link-hover);
-}
-
-.lottie300 {
-  width: 200px;
-  height: auto;
-}
-
-#logo {
-  user-select: none;
-  background-color: var(--dark);
-  padding: 15px 25px 5px 25px;
-  border-radius: 25px;
-  display: inline-block;
-  margin: 1rem 0;
-  box-shadow: 3px 3px 8px rgba(0, 0, 0, 0.3);
-  transition: all .1s ease-in-out;
-}
-
-#logo:hover {
-  filter: brightness(110%);
-  transform: scale(1.1);
-  box-shadow: 3px 3px 10px rgba(0, 0, 0, 0.5);
-}
-
-#spacing {
-  padding: 0.5em 0;
 }
 
 .navbar {
@@ -121,15 +87,6 @@ footer a:hover {
   body {
     background: var(--mobile-bg-color) !important;
     overflow-x: hidden !important;
-  }
-
-  #spacing {
-    padding: 0.8rem 0;
-  }
-
-  #copyright {
-    display: block;
-    margin-bottom: 0.5ch;
   }
 
   #grid-center-content {

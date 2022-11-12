@@ -1,10 +1,10 @@
 /* GFont: Allan, Raleway */
-@import url('https://fonts.googleapis.com/css2?family=Allan:wght@700&family=Raleway&display=swap');
+@import url('https://fonts.googleapis.com/css2?family=Raleway&display=swap');
 
 :root {
   --ff-primary: 'Raleway', sans-serif;
   --ff-secondary: 'Raleway', sans-serif;
-  --ff-logo: 'Allan', cursive;
+
   --color-ff-primary: #fff;
   --color-ff-secondary: #000;
   --color-ff-link: #ddd;
@@ -28,11 +28,6 @@
 * {
   font-family: var(--ff-primary);
   color: var(--color-ff-primary);
-}
-
-.ff-logo {
-  font-family: var(--ff-logo);
-  font-size: 3em;
 }
 
 h1,h2,h3,h4,h5,h6 {font-family: var(--ff-secondary);}
