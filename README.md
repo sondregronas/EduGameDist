@@ -2,7 +2,7 @@
 [![Build Status](https://img.shields.io/github/workflow/status/sondregronas/EduGameDist/CI)](https://github.com/sondregronas/EduGameDist/)
 [![GitHub latest commit](https://img.shields.io/github/last-commit/sondregronas/EduGameDist)](https://github.com/sondregronas/EduGameDist/commit/)
 
-A containerized way to run a game distribution server in educational settings. Requires a local network to work. You should never expose this to the internet, as it is illegal to distribute games without permission. Ensure only local devices and students can access the server.
+A containerized web based game distribution solution for educational settings. Requires access to the schools local network in order to work. You should never expose this to the internet, as it is illegal to distribute games without permission. Ensure only local devices and students can access the server.
 
 Note: Parts of this project is in Norwegian, as it was made for a Norwegian school, you can change this by editing the `.pug` files in the `views` folder by uncommenting the volume mount in the `docker-compose.yml` file.
 
@@ -63,6 +63,8 @@ services:
 ```
 
 Run using `docker-compose up -d`.
+
+Modify the generated `nav.pug` (Navigation buttons), `variables.pug` (HTML Title) and `header.pug` (Index text) in the `cfg` folder to your liking. Note that a restart is required for changes to take effect (for `.pug` files only).
 
 ## Recommended setup
 Use in conjunction with [NginxProxyManager](https://nginxproxymanager.com/) to get a nice URL for both the frontend and database. Be sure to restrict access to the server to only your local network for the frontend, as games will be accessible from the frontend.
