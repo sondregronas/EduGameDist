@@ -37,12 +37,12 @@ services:
       - ./db:/app/db
       - ./db/nc/uploads/noco/Games/Games/Cover:/app/public/img
         
-      # public/cfg = favicon and css
+      # public/cfg = favicon and css overrides
       - ./cfg:/app/public/cfg
       # Uncomment for full CSS access
       # - ./cfg/css:/app/public/css
       
-      # Choose between the header/footer/nav-menu, or the entire view folder (Advanced).
+      # Choose between the header/footer/nav-menu, or the entire views folder (Advanced).
       - ./cfg:/app/views/cfg
       # - ./cfg/views:/app/views
     environment:
