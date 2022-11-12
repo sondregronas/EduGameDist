@@ -10,24 +10,22 @@ block content
             .game-card-cover-info
                 if game.players
                     .players
-                        if game.players == 1
-                            <i class="mdi mdi-account"></i><span class="playercount">#{game.players}</span>
-                        else
-                            <i class="mdi mdi-account-group" style="padding-right: 2px;"></i><span class="playercount">#{game.players}</span>
+                        span.mdi(class=game.players === "1" ? "mdi-account" : "mdi-account-group")
+                        span.playercount=game.players
                 .platforms
                     if game.url
-                        <i class="mdi mdi-web"></i>
+                        span.mdi.mdi-web
                     if game.win_dl
-                        <i class="mdi mdi-microsoft-windows"></i>
+                        span.mdi.mdi-microsoft-windows
                     if game.mac_dl
-                        <i class="mdi mdi-apple"></i>
+                        span.mdi.mdi-apple
                     if game.linux_dl
-                        <i class="mdi mdi-linux"></i>
+                        span.mdi.mdi-linux
                     if game.android_dl
-                        <i class="mdi mdi-android"></i>
+                        span.mdi.mdi-android
                 if game.ttb
                     .ttb=game.ttb
-        h1.game-title=game['title']
+        h2.game-title=game['title']
         if game['category']
           #game-card-categories
             each category in game['category']

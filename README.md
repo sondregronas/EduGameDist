@@ -26,19 +26,27 @@ services:
     volumes:
       # Note, you can also bind any folder to a network share or different directories
       - ./games:/app/public/games
-      - ./cfg:/app/public/cfg
+      
+      # You can alternatively bind the platforms separately
+      # ./Windows:/app/public/games/Windows
+      # ./Mac:/app/public/games/Mac
+      # ./Linux:/app/public/games/Linux
+      # ./Android:/app/public/games/Android
+      
+      # ./app/db is required for persistent storage
       - ./db:/app/db
       - ./db/nc/uploads/noco/Games/Games/Cover:/app/public/img
-
-      # Choose between only a few select view-files, or the entire view folder.
-      - ./cfg:/app/views/cfg
-      # - ./cfg/views:/app/views
-
+        
+      # public/cfg = favicon and css
+      - ./cfg:/app/public/cfg
       # Uncomment for full CSS access
       # - ./cfg/css:/app/public/css
-
-      # Uncomment for full access (not recommended)
-      # - ./app:/app
+      
+      # Choose between the header/footer/nav-menu, or the entire view folder (Advanced).
+      - ./cfg:/app/views/cfg
+      # - ./cfg/views:/app/views
+    environment:
+      - TITLE="Game Server"
   db:
     image: nocodb/nocodb
     restart: unless-stopped
@@ -82,7 +90,7 @@ I recommend only giving access to the `Friendly` view to those who need access, 
 Use in conjunction with [NginxProxyManager](https://nginxproxymanager.com/) to get a nice URL for both the frontend and database. Be sure to restrict access to the server to only your local network for the frontend, as games will be accessible from the frontend.
 
 ## Development
-Improvements are very welcome, feel free to open a pull request or issue.
+Improvements are very welcome, feel free to open a pull request or issue. The CSS and tag structure is a bit of a mess, so feel free to improve it.
 
 Clone the repo and set your working directory to `src`.
 

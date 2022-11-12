@@ -6,24 +6,26 @@ block content
   #game-container
     img.game-cover(src=gameData['cover'])
     #game-info
-      h1.game-title=gameData['title']
+      // Title and developer
+      h2.game-title=gameData['title']
       if (gameData['developer'])
-          p.game-developer-info Utviklet av:
+          p.game-developer-info=`Utviklet av: `
             a(href=gameData['developer_link'] target="_blank")=gameData['developer']
+
+      // Description / Note
       p.game-description=gameData['description']
-      p.game-note!=gameData['note']
+      p.game-note=gameData['note']
+
+      // Player count / Time to beat cards
       if (gameData['players'])
-        if gameData['players'] === "1"
-          p.game-players <i class="mdi mdi-account"></i>
-            span=gameData['players']
-            span=` spiller`
-        else
-          p.game-players <i class="mdi mdi-account-group" style="padding-right: 2px;"></i>
-            span=gameData['players']
-            span=` spillere`
+        p.game-players
+          span(class=gameData['players'] === "1" ? "mdi mdi-account" : "mdi mdi-account-group")
+          span=gameData['players'] === "1" ? `1 spiller` : `${gameData['players']} spillere`
       if (gameData['ttb'])
-          p.game-ttb <i class="ttb-icon mdi mdi-clock-outline"></i><span> </span>
+          p.game-ttb
+            i.ttb-icon.mdi.mdi-clock-outline
             span=gameData['ttb']
+
     #game-download-area
       #game-download-container
         if gameData.win_dl
@@ -36,24 +38,28 @@ block content
           a.download-button(href=gameData.android_dl) Android <i class="mdi mdi-android"></i>
         if gameData.url
           a.download-button(href=gameData.url) Nettleser <i class="mdi mdi-web"></i>
+
     #game-footer
       p Spillene kan ikke deles med andre eller forlate klasserommet.
       if gameData['links'][0]
         p Du kan kjøpe spillet selv på en av følgende plattformer:
+
+        // Links
         #game-purchase-links
-          // Tegn lenker utifra leverandør
           each link in gameData['links']
             if (link.includes('steampowered.com'))
               a.game-link(href=link target="_blank") <i class="mdi mdi-steam"></i>
-            if (link.includes('humblebundle.com'))
+            else if (link.includes('humblebundle.com'))
               a.game-link(href=link target="_blank") <i class="mdi mdi-humble-bundle"></i>
-            if (link.includes('gog.com'))
+            else if (link.includes('gog.com'))
               a.game-link(href=link target="_blank") <i class="mdi mdi-gog"></i>
-            if (link.includes('nintendo.com'))
+            else if (link.includes('nintendo.com'))
               a.game-link(href=link target="_blank") <i class="mdi mdi-nintendo-switch"></i>
-            if (link.includes('apple.com'))
+            else if (link.includes('apple.com'))
               a.game-link(href=link target="_blank") <i class="mdi mdi-apple-ios"></i>
-            if (link.includes('play.google.com'))
+            else if (link.includes('play.google.com'))
               a.game-link(href=link target="_blank") <i class="mdi mdi-google-play"></i>
-            if (link.includes('itch.io'))
+            else if (link.includes('itch.io'))
               a.game-link(href=link target="_blank") <i class="fab fa-itch-io"></i>
+            else
+              a.game-link(href=link target="_blank") <i class="mdi mdi-link-variant"></i>

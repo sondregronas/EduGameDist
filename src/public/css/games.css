@@ -194,3 +194,8 @@
   padding: 15px;
   margin: 4px 1ch;
 }
+
+.mdi-account-group,
+.mdi-clock-outline{
+  padding-right: 3px;
+}

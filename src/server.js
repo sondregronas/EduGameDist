@@ -9,7 +9,7 @@ const app = express()
 
 app.use(express.static('public'))
 app.set('view engine', 'pug')
-const pugData = {}  // Leave this empty
+const pugData = {title: process.env.TITLE || 'Game Distribution Platform'}
 
 // Database
 util.serializeDB(db_file)

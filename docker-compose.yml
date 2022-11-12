@@ -8,19 +8,27 @@ services:
     volumes:
       # Note, you can also bind any folder to a network share or different directories
       - ./games:/app/public/games
-      - ./cfg:/app/public/cfg
+
+      # You can alternatively bind the platforms separately
+      # ./Windows:/app/public/games/Windows
+      # ./Mac:/app/public/games/Mac
+      # ./Linux:/app/public/games/Linux
+      # ./Android:/app/public/games/Android
+
+      # ./app/db is required for persistent storage
       - ./db:/app/db
       - ./db/nc/uploads/noco/Games/Games/Cover:/app/public/img
 
-      # Choose between only a few select view-files, or the entire view folder.
-      - ./cfg:/app/views/cfg
-      # - ./cfg/views:/app/views
-
+      # public/cfg = favicon and css
+      - ./cfg:/app/public/cfg
       # Uncomment for full CSS access
       # - ./cfg/css:/app/public/css
 
-      # Uncomment for full access (not recommended)
-      # - ./app:/app
+      # Choose between the header/footer/nav-menu, or the entire view folder (Advanced).
+      - ./cfg:/app/views/cfg
+      # - ./cfg/views:/app/views
+    environment:
+      - TITLE="Game Server"
   db:
     image: nocodb/nocodb
     restart: unless-stopped
