@@ -28,7 +28,7 @@ services:
       - ./cfg:/app/views/cfg
       # - ./cfg/views:/app/views
     environment:
-      - TITLE="Game Server"
+      - TITLE=Game Server
   db:
     image: nocodb/nocodb
     restart: unless-stopped
