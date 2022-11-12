@@ -61,7 +61,11 @@ You can login to the database page using the following credentials:
 
 Be sure to create your own superuser and change the password.
 
-The `cfg` folder includes a few files you can modify to personalize your site. `games` is where you will put your game installers / binaries in their respective platform folders. It is recommended to store all games in their respective `.zip` archives.
+The `cfg` folder includes a few files you can modify to personalize your site. 
+
+`games` is where you will put your game installers / binaries in their respective platform folders. It is recommended to store all games in their respective `.zip` archives.
+
+> **Note that a restart is required for changes to take effect (for `.pug` files only).**
 
 The database comes preconfigured with 3 different views in NocoDB (`localhost:8080`): 
 - `Games` (Grid)
@@ -76,8 +80,6 @@ I recommend only giving access to the `Friendly` view to those who need access, 
 
 ## Recommended setup
 Use in conjunction with [NginxProxyManager](https://nginxproxymanager.com/) to get a nice URL for both the frontend and database. Be sure to restrict access to the server to only your local network for the frontend, as games will be accessible from the frontend.
-
-Modify the generated `nav.pug` (Navigation buttons), `variables.pug` (HTML Title) and `header.pug` (Index text) in the `cfg` folder to your liking. Note that a restart is required for changes to take effect (for `.pug` files only).
 
 ## Development
 Clone the repo and set your working directory to `src`.<br>
