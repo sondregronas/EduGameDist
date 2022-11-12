@@ -1,0 +1,66 @@
+extends templates/layout.pug
+block variables
+  -var title = gameData['title']
+
+block content
+  #game-container
+    img.game-cover(src=gameData['cover'])
+    #game-info
+      h1.game-title=gameData['title']
+      if (gameData['developer'])
+          p.game-developer-info Utviklet av:
+            a(href=gameData['developer_link'] target="_blank")=gameData['developer']
+      p.game-description=gameData['description']
+      p.game-note!=gameData['note']
+      if (gameData['players'])
+          p.game-players <i class="players-icon mdi mdi-account"></i><span> </span>
+            span=gameData['players']
+            span  player
+      if (gameData['ttb'])
+          p.game-ttb <i class="ttb-icon mdi mdi-clock-outline"></i><span> </span>
+            span=gameData['ttb']
+    #game-download-area
+      #game-download-container
+        if gameData.win_dl
+          a.download-button.dl-win(href=gameData.win_dl)
+            | Windows <i class="mdi mdi-microsoft-windows"></i>
+        if gameData.mac_dl
+          a.download-button.dl-mac(href=gameData.mac_dl)
+            | Mac <i class="mdi mdi-apple"></i>
+        if gameData.linux_dl
+          a.download-button.dl-linux(href=gameData.linux_dl)
+            | Linux <i class="mdi mdi-linux"></i>
+        if gameData.android_dl
+          a.download-button.dl-android(href=gameData.android_dl) 
+            | Android <i class="mdi mdi-android"></i>
+        if gameData.url
+          a.download-button.dl-url(href=gameData.url)
+            | Nettleser <i class="mdi mdi-web"></i>
+    #game-footer
+      p Spillene er lisensiert eller gitt til oss av utviklerne og skal ikke deles med andre enn elever på skolen.
+      if gameData['links'][0]
+        p Du kan kjøpe spillet selv på en av følgende plattformer:
+        #game-purchase-links
+          // Tegn lenker utifra leverandør
+          each link in gameData['links']
+            if (link.includes('steampowered.com'))
+              a.game-link.game-link-steam(href=link target="_blank")
+                i.mdi.mdi-steam
+            if (link.includes('humblebundle.com'))
+              a.game-link.game-link-humblebundle(href=link target="_blank")
+                i.mdi.mdi-humble-bundle
+            if (link.includes('gog.com'))
+              a.game-link.game-link-steam(href=link target="_blank")
+                i.mdi.mdi-gog
+            if (link.includes('nintendo.com'))
+              a.game-link.game-link-nintendo(href=link target="_blank")
+                i.mdi.mdi-nintendo-switch
+            if (link.includes('apple.com'))
+              a.game-link.game-link-iphone(href=link target="_blank")
+                i.mdi.mdi-apple-ios
+            if (link.includes('play.google.com'))
+              a.game-link.game-link-android(href=link target="_blank")
+                i.mdi.mdi-google-play
+            if (link.includes('itch.io'))
+              a.game-link.game-link-itchio(href=link target="_blank")
+                i.fab.fa-itch-io

@@ -1,0 +1,196 @@
+.game-title {
+  margin: .2ch 0 0 0;
+  font-size: 1.7em;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  line-clamp: 2;
+  display: -webkit-box;
+  -webkit-line-clamp: 2;
+  -webkit-box-orient: vertical;
+}
+
+*{transition: all .2s ease-in-out;}
+
+#game-container {
+  max-width: 70vw;
+  padding: 2% 0;
+}
+
+#game-container * {
+  max-width: 70vw;
+}
+
+#game-grid {
+  display: grid;
+  justify-content: center;
+  grid-template-columns: repeat(auto-fill, minmax(300px, 1fr));
+  gap: 20px;
+  padding: 3%;
+}
+
+#game-grid-card {
+  overflow: hidden;
+  background-color: rgba(0, 0, 0, .2);
+  border-radius: 10px;
+  padding: 1.5em;
+  text-decoration: none;
+  display: grid;
+}
+
+#game-grid-card:hover {
+  transform: scale(1.05);
+  filter: drop-shadow(3px 3px 10px rgba(0, 0, 0, .5)) brightness(1.1);
+}
+
+/* Game Cover */
+.game-card-cover img {
+  width: 100%;
+}
+
+.game-cover,
+.game-card-cover img{
+  border-radius: 20px;
+  box-shadow: 3px 3px 4px rgba(0, 0, 0, .2);
+}
+
+.game-cover:hover,
+.game-card-cover img:hover,
+.game-card-cover img:hover + .game-card-cover-info{
+  transform: scale(1.01);
+  transform-origin:bottom center;
+  box-shadow: 3px 3px 6px rgba(0, 0, 0, .4);
+}
+/* End Game Cover */
+
+/* Game Card Cover Info */
+.game-card-cover-info{
+  position: relative;
+  margin-top: calc(-1.4em - 4px);
+  border-radius: 0 0 20px 20px;
+  background-color: rgba(0,20,30,.55);
+  display: flex;
+  opacity: 65%;
+  padding-inline: 1.2ch;
+}
+
+#game-grid-card:hover .game-card-cover-info,
+#game-grid-card:hover .ttb{
+  opacity: 100%;
+}
+
+.platforms, .ttb, .players{
+  padding: 2px;
+  filter: drop-shadow(1px 1px .3px rgba(0, 0, 0, 1));
+}
+
+.players{
+  margin-left: -.2ch;
+}
+
+.playercount{
+  padding-inline: .5px;
+  position: relative;
+  bottom: .9px;
+}
+
+.ttb{
+  margin-left: auto;
+  margin-top: .8px;
+  font-family: sans-serif;
+  font-weight: bold;
+  opacity: 70%;
+}
+
+/* End Game Card Cover Info */
+
+.game-link i {
+  padding-inline: .2ch;
+  color: #ddd;
+  display: inline-block;
+  transition: all .2s ease-in-out;
+  margin-top: .5ch;
+  font-size: 2.2em;
+}
+
+.game-link i:hover {
+  transform: scale(1.2);
+  color: #fff;
+  filter: drop-shadow(2px 2px 6px rgba(0, 0, 0, .5));
+}
+
+.game-card-category {
+  display: inline-block;
+  background-color: var(--color-primary-light);
+  font-size: 1em;
+  border-radius: 8px;
+  padding: 5px;
+  margin: .8ch .5ch 0 .5ch;
+}
+
+.download-label {
+  margin: .5ch 0;
+}
+
+.download-button {
+  display: inline-block;
+  background-color: var(--color-primary-light);
+  font-size: 1.2em;
+  border-radius: 8px;
+  padding: 1ch;
+  margin-inline: .5ch;
+  text-decoration: none;
+  transition: all .2s ease-in-out;
+}
+
+.download-button:hover {
+  transform: scale(1.1);
+  filter: brightness(1.1);
+  box-shadow: 2px 2px 6px 1px rgba(0, 0, 0, .2);
+}
+
+.download-button * {
+  margin: 0;
+}
+
+.game-developer-info {
+  margin: 0 0 2ch 0;
+  font-size: .8em;
+}
+
+.game-developer-info a {
+  color: var(--color-ff-link);
+  transition: all .1s ease-in-out;
+}
+
+.game-developer-info a:hover {
+  color: var(--color-ff-link-hover);
+}
+
+#game-download-area {
+  margin: 3% 0;
+}
+
+#game-footer {
+  margin-top: 2ch;
+  font-size: .8em;
+}
+
+#game-footer p {
+  margin: 0;
+  color: #ddd;
+}
+
+.game-description {
+  opacity: 60%;
+  font-size: .8em;
+  width: 70%;
+  font-style: italic;
+}
+
+.game-ttb, .game-players{
+  display: inline-block;
+  background-color: #2228;
+  border-radius: 20px;
+  padding: 15px;
+  margin: 4px 1ch;
+}

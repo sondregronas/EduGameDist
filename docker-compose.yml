@@ -1,0 +1,29 @@
+version: "3.3"
+services:
+  frontend:
+    image: ghcr.io/vaagenim/spill.iktim.no
+    restart: unless-stopped
+    ports:
+      - "80:80"
+    volumes:
+      - ./games:/app/public/games
+      - ./cfg:/app/public/cfg
+      - ./db:/app/db
+      - ./db/nc/uploads/noco/Games/Games/Cover:/app/public/img
+
+      # Choose between only a few select view-files, or the entire view folder.
+      - ./cfg:/app/views/cfg
+      # - ./cfg/views:/app/views
+
+      # Uncomment for full CSS access
+      # - ./cfg/css:/app/public/css
+
+      # Uncomment for full access (not recommended)
+      # - ./app:/app
+  db:
+    image: nocodb/nocodb
+    restart: unless-stopped
+    ports:
+      - "8080:8080"
+    volumes:
+      - ./db:/usr/app/data/

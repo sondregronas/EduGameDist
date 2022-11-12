@@ -1,0 +1,89 @@
+name: CI
+
+# This workflow uses actions that are not certified by GitHub.
+# They are provided by a third-party and are governed by
+# separate terms of service, privacy policy, and support
+# documentation.
+
+env:
+  docker-container: sondregronas/EduGameDist
+  platforms: linux/amd64,linux/arm64/v8,linux/arm/v7
+
+on:
+  push:
+    branches: [main]
+    tags: [v*]
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      packages: write
+    if: ${{ !contains(github.event.head_commit.message, '[skip ci]') }}
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v3
+
+      - name: Prepare
+        id: prepare
+        run: |
+          if [[ $GITHUB_REF == refs/tags/* ]]; then
+            echo ::set-output name=tag::${GITHUB_REF#refs/tags/}
+          elif [[ $GITHUB_REF == refs/heads/main ]]; then
+            echo ::set-output name=tag::latest
+          else
+            echo ::set-output name=tag::${GITHUB_REF#refs/heads/}
+          fi
+          if [[ $GITHUB_REF == refs/tags/*-beta ]]; then
+            echo ::set-output name=branch::beta
+          elif [[ $GITHUB_REF == refs/tags/* ]]; then
+            echo ::set-output name=branch::main
+          else
+            echo ::set-output name=branch::${GITHUB_REF#refs/heads/}
+          fi
+          echo ::set-output name=commit::${GITHUB_SHA}
+          echo ::set-output name=build_date::$(date -u +'%Y-%m-%dT%H:%M:%SZ')
+          echo ::set-output name=docker_platforms::${{ env.platforms }}
+          echo ::set-output name=docker_image::${{ env.docker-container }}
+      - name: Set Up QEMU
+        uses: docker/setup-qemu-action@v2
+
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v2
+        id: buildx
+        with:
+          version: latest
+
+      - name: Cache Docker Layers
+        uses: actions/cache@v3
+        with:
+          path: /tmp/.buildx-cache
+          key: ${{ runner.os }}-buildx-${{ github.sha }}
+          restore-keys: |
+            ${{ runner.os }}-buildx-
+      - name: Log into registry GHCR
+        if: success()
+        uses: docker/login-action@v2
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Docker Build and Push
+        uses: docker/build-push-action@v3
+        if: success()
+        with:
+          context: .
+          file: ./Dockerfile
+          push: true
+          platforms: ${{ steps.prepare.outputs.docker_platforms }}
+          build-args: |
+            TAG=${{ steps.prepare.outputs.tag }}
+            BRANCH=${{ steps.prepare.outputs.branch }}
+            COMMIT=${{ steps.prepare.outputs.commit }}
+            BUILD_DATE=${{ steps.prepare.outputs.build_date }}
+          tags: |
+            ghcr.io/${{ steps.prepare.outputs.docker_image }}:${{ steps.prepare.outputs.tag }}
+          cache-from: type=local,src=/tmp/.buildx-cache
+          cache-to: type=local,dest=/tmp/.buildx-cache

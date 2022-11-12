@@ -1,0 +1,34 @@
+extends templates/layout.pug
+  
+block content
+  include cfg/header
+  #game-grid
+    each game, link in gameList
+      a#game-grid-card(href=link)
+        .game-card-cover
+            img(src=game['cover'])
+            .game-card-cover-info
+                if game.players
+                    .players
+                        if game.players == 1
+                            <i class="mdi mdi-account"></i><span class="playercount">#{game.players}</span>
+                        else
+                            <i class="mdi mdi-account-group" style="padding-right: 2px;"></i><span class="playercount">#{game.players}</span>
+                .platforms
+                    if game.url
+                        <i class="mdi mdi-web"></i>
+                    if game.win_dl
+                        <i class="mdi mdi-microsoft-windows"></i>
+                    if game.mac_dl
+                        <i class="mdi mdi-apple"></i>
+                    if game.linux_dl
+                        <i class="mdi mdi-linux"></i>
+                    if game.android_dl
+                        <i class="mdi mdi-android"></i>
+                if game.ttb
+                    .ttb=game.ttb
+        h1.game-title=game['title']
+        if game['category']
+          #game-card-categories
+            each category in game['category']
+              .game-card-category=category

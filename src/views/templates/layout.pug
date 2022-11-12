@@ -1,0 +1,14 @@
+doctype html
+html(lang="no")
+  head
+    include head.pug
+  body
+    #grid-center
+      center#grid-center-content
+        header
+          .navbar
+            include ../cfg/nav
+        section#content
+          block content
+        footer
+          include ../cfg/footer
