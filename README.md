@@ -33,7 +33,7 @@ services:
       # ./Linux:/app/public/games/Linux
       # ./Android:/app/public/games/Android
       
-      # ./app/db is required for persistent storage
+      # /app/db is required for persistent storage
       - ./db:/app/db
       - ./db/nc/uploads/noco/Games/Games/Cover:/app/public/img
         
