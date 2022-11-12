@@ -9,13 +9,18 @@ Note: Parts of this project is in Norwegian, as it was made for a Norwegian scho
 ## What is this?
 Traditionally games have been distributed on physical media. This is a problem for schools, as they have to buy a lot of physical media, and it is hard to keep track of who has what. This project aims to solve this problem by providing a way to distribute games over a local network.
 
-For information on how to get access to distribution friendly games, see [this article by spillpedagogene (Norwegian)](https://www.spillpedagogene.no/2016/12/06/spill-i-skolen-innkjop-og-logistikk/).
+For information on how to get access to distribution friendly games, see [this article by spillpedagogene (Norwegian)](https://www.spillpedagogbanken.no/?faq=hva-er-steam-epic-itch-io-gog-og-humblebundle).
 
 ## Usage
 Default username: `admin@change.me`
 Default password: `changeme`
 
+Frontend url: `localhost`
+Database url: `localhost:8080`
+
 Be sure to create a new superuser and change the password.
+
+A few folders should appear when you first run the `docker-compose.yml` file. `games` is where you will put your game installers / binaries in their respective platform folders. It is recommended to wrap all games in `.zip` archives. You can leave `db` alone, this is accessed via the database platform. `cfg` includes a few files you can modify to personalize your site.
 
 The project is preconfigured with 3 different views for NocoDB (`localhost:8080`): 
 - `Games` (Grid)
@@ -24,9 +29,9 @@ The project is preconfigured with 3 different views for NocoDB (`localhost:8080`
 
 ![img](assets/form.png)
 
-The `New entry` form should be used to add new games to the database. The `Friendly` view should be used to add information about the games.
+The `New entry` form can be used to add new games to the database. The `Friendly` view allows for changing relevant metadata only.
 
-I recommend giving access to the `Friendly` view to those who should be able to edit information on the games.
+I recommend only giving access to the `Friendly` view to those who need access, as the hidden values seldom need modification.
 
 ## Setup
 Create a `docker-compose.yml`:
@@ -62,19 +67,17 @@ services:
       - ./db:/usr/app/data/
 ```
 
-Run using `docker-compose up -d`.
-
-Modify the generated `nav.pug` (Navigation buttons), `variables.pug` (HTML Title) and `header.pug` (Index text) in the `cfg` folder to your liking. Note that a restart is required for changes to take effect (for `.pug` files only).
+Run using `docker-compose up -d`. A few folders should appear.
 
 ## Recommended setup
 Use in conjunction with [NginxProxyManager](https://nginxproxymanager.com/) to get a nice URL for both the frontend and database. Be sure to restrict access to the server to only your local network for the frontend, as games will be accessible from the frontend.
+
+Modify the generated `nav.pug` (Navigation buttons), `variables.pug` (HTML Title) and `header.pug` (Index text) in the `cfg` folder to your liking. Note that a restart is required for changes to take effect (for `.pug` files only).
 
 ## Development
 Clone the repo and set your working directory to `src`.<br>
 Install dependencies using `npm i`.<br>
 The dev-mode can be activated by running `npm run dev`, which will automatically refresh the server when changes are made.<br>
-
-The database is based on SQLite, and can be accessed using the [NocoDB](https://github.com/nocodb/nocodb) frontend (`localhost:8080`).
 
 ## License
 This project is licensed under the MIT License - see the [LICENSE](LICENSE) file for details
