@@ -2,7 +2,7 @@
 [![Build Status](https://img.shields.io/github/workflow/status/sondregronas/EduGameDist/CI)](https://github.com/sondregronas/EduGameDist/)
 [![GitHub latest commit](https://img.shields.io/github/last-commit/sondregronas/EduGameDist)](https://github.com/sondregronas/EduGameDist/commit/)
 
-A containerized web based game distribution solution for educational settings. Requires access to the schools local network in order to work. You should never expose this to the internet, as it is illegal to distribute games without permission. Ensure only local devices and students can access the server.
+A containerized web based game distribution solution for educational settings. Requires access to the schools local network in order to work. You should never expose this to the internet, as it is illegal to distribute games without permission. Ensure only local devices and students have access to the server.
 
 Note: Parts of this project is in Norwegian, as it was made for a Norwegian school, you can change this by editing the `.pug` files in the `views` folder by uncommenting the volume mount in the `docker-compose.yml` file.
 
