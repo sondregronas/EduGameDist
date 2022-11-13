@@ -76,7 +76,7 @@ The `New entry` form can be used to add new games to the database. The `Friendly
 
 I recommend only giving access to the `Friendly` view to those who need access, as the hidden values seldom need modification.
 
-The `Note` column allows for unescaped HTML, which allows inputting relevant links or additional files. For example: `<a href="games/Windows/MyGame-DLC.zip">DLC</a>` or `<a href="https://<external-site>PDF Manual</a>`.
+The `Note` column allows for unescaped HTML, which allows inputting relevant links or additional files. For example: `<a href="games/Windows/MyGame-DLC.zip">DLC</a>` or `<a href="https://<external-site">PDF Manual</a>`.
 
 ## Recommended setup
 Use in conjunction with [NginxProxyManager](https://nginxproxymanager.com/) to get a nice URL for both the frontend and database. Be sure to restrict access to the server to only your local network for the frontend, as games will be accessible from the frontend.
