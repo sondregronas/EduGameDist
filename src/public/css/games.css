@@ -44,7 +44,7 @@
 
 /* Game Cover */
 .game-card-cover img {
-  width: 100%;
+  aspect-ratio: 460/215;
 }
 
 .game-cover,
