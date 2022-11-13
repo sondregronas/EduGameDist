@@ -2,16 +2,7 @@
 [![Build Status](https://img.shields.io/github/workflow/status/sondregronas/EduGameDist/CI)](https://github.com/sondregronas/EduGameDist/)
 [![GitHub latest commit](https://img.shields.io/github/last-commit/sondregronas/EduGameDist)](https://github.com/sondregronas/EduGameDist/commit/)
 
-<details>
-<summary><h2>:mag: Preview</h2></summary>
-
-  Simple frontend, a grid of all games.
-  ![Frontend](assets/frontend.gif)
-  
-  Nocodb database interface, with an intuitive interface.
-  ![Backend](assets/backend.gif)
-
-</details>
+![Frontend](assets/frontend.gif)
 
 A containerized web based game distribution solution for educational settings. Requires control of the local network to function. Please do not expose your instance to the internet, as it is illegal to distribute games without permission. Ensure only local devices and eligible students gain access to the server.
 
@@ -79,7 +70,7 @@ The database comes preconfigured with 3 different views in NocoDB (`localhost:80
 - `Friendly` (Gallery view)
 - `New entry` (Form)
 
-![img](assets/form.png)
+![Backend](assets/backend.gif)
 
 The `New entry` form can be used to add new games to the database. The `Friendly` view allows for changing relevant metadata only.
 
