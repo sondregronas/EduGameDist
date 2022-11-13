@@ -6,7 +6,7 @@ block content
     each game, link in gameList
       a#game-grid-card(href=link)
         .game-card-cover
-            img(src=game['cover'])
+            img(src=game['cover'] loading="lazy")
             .game-card-cover-info
                 if game.players
                     .players

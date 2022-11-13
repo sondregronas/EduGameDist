@@ -2,6 +2,17 @@
 [![Build Status](https://img.shields.io/github/workflow/status/sondregronas/EduGameDist/CI)](https://github.com/sondregronas/EduGameDist/)
 [![GitHub latest commit](https://img.shields.io/github/last-commit/sondregronas/EduGameDist)](https://github.com/sondregronas/EduGameDist/commit/)
 
+<details>
+<summary><h2>:mag: Preview</h2></summary>
+
+  Simple frontend, a grid of all games.
+  ![Frontend](assets/frontend.gif)
+  
+  Nocodb database interface, with an intuitive interface.
+  ![Backend](assets/backend.gif)
+
+</details>
+
 A containerized web based game distribution solution for educational settings. Requires control of the local network to function. Please do not expose your instance to the internet, as it is illegal to distribute games without permission. Ensure only local devices and eligible students gain access to the server.
 
 > Note: Parts of this project is in Norwegian, as it was made for a Norwegian school, you can change this by editing the `.pug` files in the `views` folder by uncommenting the volume mount in the `docker-compose.yml` file.
@@ -14,7 +25,7 @@ Not every game is eligible for distribution, and you may be required to obtain l
 ## Setup
 Runs on [Docker](https://www.docker.com/).
 
-Create a `docker-compose.yml`, or download the [docker-compose.yml](docker-compose.yml) file for more options:
+Create a `docker-compose.yml`, or download the [docker-compose.yml](docker-compose.yml) file, which includes more options:
 ```yaml
 version: "3.3"
 services:
@@ -48,7 +59,7 @@ Run using `docker-compose up -d`. A few folders should appear.
 
 ## Usage
 Navigate to the URLs hosted by docker:
-- Frontend url: `localhost`<br>
+- Frontend url: `localhost:80`<br>
 - Database url: `localhost:8080`
 
 You can login to the database page using the following credentials:
@@ -59,9 +70,9 @@ Be sure to create your own superuser and change the password.
 
 The `cfg` folder includes a few files you can modify to personalize your site. 
 
-`games` is where you will put your game installers / binaries in their respective platform folders. It is recommended to store all games in their respective `.zip` archives.
-
 > **Note that a restart is required for changes to take effect (for `.pug` files only).**
+
+`games` is where you will put your game installers / binaries in their respective platform folders. It is recommended to store all games in their respective `.zip` archives.
 
 The database comes preconfigured with 3 different views in NocoDB (`localhost:8080`): 
 - `Games` (Grid)
@@ -73,6 +84,8 @@ The database comes preconfigured with 3 different views in NocoDB (`localhost:80
 The `New entry` form can be used to add new games to the database. The `Friendly` view allows for changing relevant metadata only.
 
 I recommend only giving access to the `Friendly` view to those who need access, as the hidden values seldom need modification.
+
+The column called `Note` allows for unescaped HTML, so you can add any relevant links or additional files here, such as a link to a game manual (`.pdf`), or DLC content by linking to a `.zip` archive (I.e. `<a href="games/Windows/MyGame-DLC.zip">DLC</a>`).
 
 ## Recommended setup
 Use in conjunction with [NginxProxyManager](https://nginxproxymanager.com/) to get a nice URL for both the frontend and database. Be sure to restrict access to the server to only your local network for the frontend, as games will be accessible from the frontend.
