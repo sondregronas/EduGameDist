@@ -2,19 +2,19 @@
 [![Build Status](https://img.shields.io/github/workflow/status/sondregronas/EduGameDist/CI)](https://github.com/sondregronas/EduGameDist/)
 [![GitHub latest commit](https://img.shields.io/github/last-commit/sondregronas/EduGameDist)](https://github.com/sondregronas/EduGameDist/commit/)
 
-A containerized web based game distribution solution for educational settings. Requires local network access to function. You should never expose this to the internet, as it is illegal to distribute games without permission. Ensure only local devices and legible students have access to the server.
+A containerized web based game distribution solution for educational settings. Requires control of the local network to function. Please do not expose your instance to the internet, as it is illegal to distribute games without permission. Ensure only local devices and eligible students gain access to the server.
 
-Note: Parts of this project is in Norwegian, as it was made for a Norwegian school, you can change this by editing the `.pug` files in the `views` folder by uncommenting the volume mount in the `docker-compose.yml` file.
+> Note: Parts of this project is in Norwegian, as it was made for a Norwegian school, you can change this by editing the `.pug` files in the `views` folder by uncommenting the volume mount in the `docker-compose.yml` file.
 
 ## What is this?
-Traditionally games have been distributed on physical media. This is a problem for schools, as they have to buy a lot of physical media, and it is hard to keep track of who has what. This project aims to solve this problem by providing a way to distribute games over a local network.
+Traditionally games have been distributed on physical media. This is a problem, as it requires one to buy a lot of physical media, and it is hard to keep track of who has what. This project aims to solve this problem by providing a way to distribute games over IP.
 
-For information on how to get access to distribution friendly games, see [this article by spillpedagogbanken (Norwegian)](https://www.spillpedagogbanken.no/?faq=hva-er-steam-epic-itch-io-gog-og-humblebundle).
+Not every game is eligible for distribution, and you may be required to obtain licenses for some. For information on how to get access to distribution friendly games, see [this article by spillpedagogbanken (Norwegian)](https://www.spillpedagogbanken.no/?faq=hva-er-steam-epic-itch-io-gog-og-humblebundle).
 
 ## Setup
 Runs on [Docker](https://www.docker.com/).
 
-Create a `docker-compose.yml`, or download the [docker-compose.yml](docker-compose.yml) file:
+Create a `docker-compose.yml`, or download the [docker-compose.yml](docker-compose.yml) file for more options:
 ```yaml
 version: "3.3"
 services:
@@ -24,27 +24,15 @@ services:
     ports:
       - "80:80"
     volumes:
-      # Note, you can also bind any folder to a network share or different directories
       - ./games:/app/public/games
-      
-      # You can alternatively bind the platforms separately
-      # ./Windows:/app/public/games/Windows
-      # ./Mac:/app/public/games/Mac
-      # ./Linux:/app/public/games/Linux
-      # ./Android:/app/public/games/Android
       
       # /app/db is required for persistent storage
       - ./db:/app/db
       - ./db/nc/uploads/noco/Games/Games/Cover:/app/public/img
-        
-      # public/cfg = favicon and css overrides
+
+      # Personalization options
       - ./cfg:/app/public/cfg
-      # Uncomment for full CSS access
-      # - ./cfg/css:/app/public/css
-      
-      # Choose between the header/footer/nav-menu, or the entire views folder (Advanced).
       - ./cfg:/app/views/cfg
-      # - ./cfg/views:/app/views
     environment:
       - TITLE=Game Server
   db:
@@ -97,6 +85,11 @@ Clone the repo and set your working directory to `src`.
 Install dependencies using `npm i`.
 
 The dev-mode can be activated by running `npm run dev`, which will automatically refresh the server when changes are made.
+
+## Updates
+Currently there is no simple way of updating your instance in case of database changes, so adding additional features must be done manually. Be sure to create a backup of both `noco.db.defaults` and `gamedb.db` before updating.
+
+I intend to tackle this later, but for now the database columns in `gamedb.db` will not change, so worst case you'll lose out on new features when and if they are added.
 
 ## License
 This project is licensed under the MIT License - see the [LICENSE](LICENSE) file for details
