@@ -1,6 +1,7 @@
 FROM node:lts-slim
 ENV NODE_ENV=production
 ENV DOCKER=true
+ENV TITLE=Game Server
 
 RUN apt-get update && apt-get install -y python3 build-essential && rm -rf /var/lib/apt/lists/*
 
