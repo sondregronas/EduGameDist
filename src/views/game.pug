@@ -14,7 +14,7 @@ block content
 
       // Description / Note
       p.game-description=gameData['description']
-      p.game-note=gameData['note']
+      p.game-note!=gameData['note']
 
       // Player count / Time to beat cards
       if (gameData['players'])
