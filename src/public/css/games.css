@@ -42,9 +42,114 @@
   filter: drop-shadow(3px 3px 10px rgba(0, 0, 0, .5)) brightness(1.1);
 }
 
-/* Game Cover */
-.game-card-cover img {
+/* Game Cover 
+   Loading animation borrowed from https://codepen.io/carpenumidium/pen/ngqgqr */
+.game-card-cover img{
   aspect-ratio: 460/215;
+  background-color: var(--color-primary-dark);
+  --loader-color: var(--color-secondary-light);
+
+  background-image:linear-gradient(var(--loader-color),var(--loader-color)),
+  linear-gradient(var(--loader-color),var(--loader-color)),
+  linear-gradient(var(--loader-color),var(--loader-color)),
+  linear-gradient(var(--loader-color),var(--loader-color)),
+  linear-gradient(var(--loader-color),var(--loader-color)),
+  linear-gradient(var(--loader-color),var(--loader-color)),
+  linear-gradient(var(--loader-color),var(--loader-color));
+
+  background-position: 
+  calc(50% - 30px) 50%,
+  calc(50% - 20px) 50%,
+  calc(50% - 10px) 50%,
+  50% 50%,
+  calc(50% + 10px) 50%,
+  calc(50% + 20px) 50%,
+  calc(50% + 30px) 50%;
+
+  background-size: 
+  5px 10px,
+  5px 10px,
+  5px 10px,
+  5px 10px,
+  5px 10px,
+  5px 10px,
+  5px 10px;
+  background-repeat: no-repeat;
+
+  animation: l-bars .8s linear infinite alternate;
+}
+
+@keyframes l-bars {
+  0% {  
+    background-size: 
+      5px 30px,
+      5px 10px,
+      5px 10px,
+      5px 10px,
+      5px 10px,
+      5px 10px,
+      5px 10px;
+    }
+  16.6% {  
+    background-size: 
+      5px 10px,
+      5px 40px,
+      5px 10px,
+      5px 10px,
+      5px 10px,
+      5px 10px,
+      5px 10px;
+    }
+  33.2% {  
+    background-size: 
+      5px 10px,
+      5px 10px,
+      5px 40px,
+      5px 10px,
+      5px 10px,
+      5px 10px,
+      5px 10px;
+    }
+  49.8% {  
+    background-size: 
+      5px 10px,
+      5px 10px,
+      5px 10px,
+      5px 40px,
+      5px 10px,
+      5px 10px,
+      5px 10px;
+    }
+  66.4% {  
+    background-size: 
+      5px 10px,
+      5px 10px,
+      5px 10px,
+      5px 10px,
+      5px 40px,
+      5px 10px,
+      5px 10px;
+    }
+  83% {  
+    background-size: 
+      5px 10px,
+      5px 10px,
+      5px 10px,
+      5px 10px,
+      5px 10px,
+      5px 40px,
+      5px 10px;
+    }
+  100% {  
+    background-size: 
+      5px 10px,
+      5px 10px,
+      5px 10px,
+      5px 10px,
+      5px 10px,
+      5px 10px,
+      5px 40px;
+    }
 }
 
 .game-cover,
