@@ -4,14 +4,14 @@
 
 ![Frontend](assets/frontend.gif)
 
-A containerized web based game distribution solution for educational environments. Requires control of a local network to function. Please do not expose your instance to the internet, as it is illegal to distribute games without permission. Ensure only local devices and eligible students have access to the frontend.
+A docker based web solution for game distribution in educational environments. Requires control of a local network to function. Please do not expose your instance to the internet, as distributing games without permission is illegal. Ensure only local devices and eligible students have access to the frontend.
 
 > Note: Parts of this project is in Norwegian, as it was made for a Norwegian school, you can change this by editing the `.pug` files in the `views` folder by uncommenting the volume mount in the `docker-compose.yml` file.
 
 ## What is this?
-Traditionally games have been distributed on physical media. This is a problem, as it requires a lot of physical media, and it is hard to keep track of who has what. This project aims to solve this problem by providing a way to distribute games over a local network.
+In September of 2022, Spillpedagogene wrote an article ([Skriftlige innspill til Regjeringens Spillstrategi](https://www.spillpedagogene.no/2022/09/01/skriftlige-innspill-til-regjeringens-spillstrategi/)) regarding the logistical struggles of using games in education. Traditionally distribution of games is done by physical medium such as USB drives, or limited to browser based games. This project aims to simplify distribution by providing a way to centralize the game library using a web interface, allowing you to both manage and distribute your own internal game library.
 
-Not every game is eligible for distribution, and you may be required to obtain licenses for some. For information on how to get access to distribution friendly games, see [this article by spillpedagogbanken (Norwegian)](https://www.spillpedagogbanken.no/?faq=hva-er-steam-epic-itch-io-gog-og-humblebundle).
+Not every game is eligible for distribution, and you may be required to obtain licenses for some. For information on how to acquire games for distribution, see [this article by spillpedagogbanken (Norwegian)](https://www.spillpedagogbanken.no/?faq=hva-er-steam-epic-itch-io-gog-og-humblebundle).
 
 ## Installation
 Runs on [Docker](https://www.docker.com/).
@@ -82,7 +82,7 @@ The `Note` column allows for unescaped HTML, which allows inputting relevant lin
 `<a href="games/Windows/MyGame-DLC.zip">DLC</a>` or `<a href="https://<external-site>.pdf">PDF Manual</a>`.
 
 ## Recommended setup
-If you own a domain name, you can create an `A-record` pointing to the IP-adress of your local server, which will automatically point to port 80. Alternatively, use in conjunction with [NginxProxyManager](https://nginxproxymanager.com/) to create URLs for both frontend and backend. Be sure to restrict access to the server to only your local network for the frontend, as games WILL be accessible from the frontend.
+If you own a domain name, you can create an `A-record` pointing to the IP-address of your local server, which will automatically point to port 80. Alternatively, use in conjunction with [NginxProxyManager](https://nginxproxymanager.com/) to create URLs for both frontend and backend. Be sure to restrict access to the server to only your local network for the frontend, as games WILL be accessible from the frontend.
 
 Uploading games remotely can either be done via [network shares (Samba/CIFS)](https://support.microsoft.com/en-us/windows/file-sharing-over-a-network-in-windows-b58704b2-f53a-4b82-7bc1-80f9994725bf#:~:text=To%20share%20a%20file%20or,users%20access%20to%20the%20file.) or by using external drives. For external use I recommend configuring a SFTP server, for example using https://hub.docker.com/r/atmoz/sftp.
 
@@ -99,6 +99,9 @@ The dev-mode can be activated by running `npm run dev`, which will automatically
 Currently there is no simple way of updating your instance in case of database changes, so adding additional features must be done manually. Be sure to create a backup of both `noco.db.defaults` and `gamedb.db` before updating.
 
 I intend to tackle this later, but for now the database columns in `gamedb.db` will not change, so worst case you'll lose out on new features when and if they are added.
+
+## Disclaimer
+While this project allows for managing distribution of games or any files over the internet, it's only intended for local and internal use. Take additional precautions to ensure the service is only accessible to those eligible by law in your area. It is possible to give access to broader audiences, but in doing so you are operating at your own risk.
 
 ## License
 This project is licensed under the MIT License - see the [LICENSE](LICENSE) file for details
