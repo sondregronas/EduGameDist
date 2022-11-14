@@ -6,7 +6,7 @@
 
 A docker based web solution for game distribution in educational environments. Requires control of a local network to function. Please do not expose your instance to the internet, as distributing games without permission is illegal. Ensure only local devices and eligible students have access to the frontend.
 
-> Note: Parts of this project is in Norwegian, as it was made for a Norwegian school, you can change this by editing the `.pug` files in the `views` folder by uncommenting the volume mount in the `docker-compose.yml` file.
+> **Note:** Parts of this project is in Norwegian, as it was made for a Norwegian school, you can change this by editing the `.pug` files in the `views` folder by uncommenting the volume mount in the `docker-compose.yml` file.
 
 ## What is this?
 In September of 2022, Spillpedagogene wrote an article ([Skriftlige innspill til Regjeringens Spillstrategi](https://www.spillpedagogene.no/2022/09/01/skriftlige-innspill-til-regjeringens-spillstrategi/)) regarding the logistical struggles of using games in education. Traditionally distribution of games is done by physical medium such as USB drives, or limited to browser based games. This project aims to simplify distribution by providing a way to centralize the game library using a web interface, allowing you to both manage and distribute your own internal game library.
@@ -65,7 +65,7 @@ The `cfg` folder includes a few files you can modify to personalize your site.
 
 > **Note that a restart is required for changes to take effect (for `.pug` files only).**
 
-`games` is where you will put your game installers / binaries in their respective platform folders. It is recommended to store all games in their respective `.zip` archives.
+`games` is where you will put your game installers / binaries in their respective platform folders. It is recommended to store all games in their respective `.zip` archives. Keep note of the filenames, as you will need to point to it in the `New entry` form to add it to your library.
 
 The database comes preconfigured with 3 different views in NocoDB (`localhost:8080`): 
 - `Games` (Grid)
@@ -74,12 +74,12 @@ The database comes preconfigured with 3 different views in NocoDB (`localhost:80
 
 ![Backend](assets/backend.gif)
 
-The `New entry` form can be used to add new games to the database. The `Friendly` view allows for changing relevant metadata only.
+The `New entry` form can be used to add new games to the database. The `Friendly` view only provides access to the `Cover`, `Time`, `Players`, `Note` and `Categories` fields. I recommend limiting access to the `Friendly` view for your team, and only giving access to `New entry` to administrators.
 
-I recommend only giving access to the `Friendly` view to those who need access, as the hidden values seldom need modification.
-
-The `Note` column allows for unescaped HTML, which allows inputting relevant links or additional files. For example:<br>
-`<a href="games/Windows/MyGame-DLC.zip">DLC</a>` or `<a href="https://<external-site>.pdf">PDF Manual</a>`.
+> **Note:** The `Note` column allows for unescaped HTML, which allows inputting relevant links or additional files. For example:<br>
+> `<a href="games/Windows/MyGame-DLC.zip">DLC</a>` or `<a href="https://<external-site>.pdf">PDF Manual</a>`.
+>
+> Should you wish to disable this behavior, simply omit the `!` symbol from `p.game-note!=gameData['note']` in [game.pug](https://github.com/sondregronas/EduGameDist/blob/main/src/views/game.pug#L17)
 
 ## Recommended setup
 If you own a domain name, you can create an `A-record` pointing to the IP-address of your local server, which will automatically point to port 80. Alternatively, use in conjunction with [NginxProxyManager](https://nginxproxymanager.com/) to create URLs for both frontend and backend. Be sure to restrict access to the server to only your local network for the frontend, as games WILL be accessible from the frontend.
