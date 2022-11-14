@@ -4,16 +4,16 @@
 
 ![Frontend](assets/frontend.gif)
 
-A containerized web based game distribution solution for educational settings. Requires control of the local network to function. Please do not expose your instance to the internet, as it is illegal to distribute games without permission. Ensure only local devices and eligible students gain access to the server.
+A containerized web based game distribution solution for educational environments. Requires control of a local network to function. Please do not expose your instance to the internet, as it is illegal to distribute games without permission. Ensure only local devices and eligible students have access to the frontend.
 
 > Note: Parts of this project is in Norwegian, as it was made for a Norwegian school, you can change this by editing the `.pug` files in the `views` folder by uncommenting the volume mount in the `docker-compose.yml` file.
 
 ## What is this?
-Traditionally games have been distributed on physical media. This is a problem, as it requires one to buy a lot of physical media, and it is hard to keep track of who has what. This project aims to solve this problem by providing a way to distribute games over IP.
+Traditionally games have been distributed on physical media. This is a problem, as it requires a lot of physical media, and it is hard to keep track of who has what. This project aims to solve this problem by providing a way to distribute games over a local network.
 
 Not every game is eligible for distribution, and you may be required to obtain licenses for some. For information on how to get access to distribution friendly games, see [this article by spillpedagogbanken (Norwegian)](https://www.spillpedagogbanken.no/?faq=hva-er-steam-epic-itch-io-gog-og-humblebundle).
 
-## Setup
+## Installation
 Runs on [Docker](https://www.docker.com/).
 
 Create a `docker-compose.yml`, or download the [docker-compose.yml](docker-compose.yml) file, which includes more options:
@@ -48,6 +48,8 @@ services:
 
 Run using `docker-compose up -d`. A few folders should appear.
 
+Please refer to the docker manual if you wish to customize your ports or volume locations.
+
 ## Usage
 Navigate to the URLs hosted by docker:
 - Frontend url: `localhost:80`<br>
@@ -76,10 +78,13 @@ The `New entry` form can be used to add new games to the database. The `Friendly
 
 I recommend only giving access to the `Friendly` view to those who need access, as the hidden values seldom need modification.
 
-The `Note` column allows for unescaped HTML, which allows inputting relevant links or additional files. For example: `<a href="games/Windows/MyGame-DLC.zip">DLC</a>` or `<a href="https://<external-site">PDF Manual</a>`.
+The `Note` column allows for unescaped HTML, which allows inputting relevant links or additional files. For example:<br>
+`<a href="games/Windows/MyGame-DLC.zip">DLC</a>` or `<a href="https://<external-site>.pdf">PDF Manual</a>`.
 
 ## Recommended setup
-Use in conjunction with [NginxProxyManager](https://nginxproxymanager.com/) to get a nice URL for both the frontend and database. Be sure to restrict access to the server to only your local network for the frontend, as games will be accessible from the frontend.
+If you own a domain name, you can create an `A-record` pointing to the IP-adress of your local server, which will automatically point to port 80. Alternatively, use in conjunction with [NginxProxyManager](https://nginxproxymanager.com/) to create URLs for both frontend and backend. Be sure to restrict access to the server to only your local network for the frontend, as games WILL be accessible from the frontend.
+
+Uploading games remotely can either be done via [network shares (Samba/CIFS)](https://support.microsoft.com/en-us/windows/file-sharing-over-a-network-in-windows-b58704b2-f53a-4b82-7bc1-80f9994725bf#:~:text=To%20share%20a%20file%20or,users%20access%20to%20the%20file.) or by using external drives. For external use I recommend configuring a SFTP server, for example using https://hub.docker.com/r/atmoz/sftp.
 
 ## Development
 Improvements are very welcome, feel free to open a pull request or issue. The CSS and tag structure is a bit of a mess, so feel free to improve it.
