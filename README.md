@@ -76,6 +76,8 @@ The database comes preconfigured with 3 different views in NocoDB (`localhost:80
 
 The `New entry` form can be used to add new games to the database. The `Friendly` view only provides access to the `Cover`, `Time`, `Players`, `Note` and `Categories` fields. I recommend limiting access to the `Friendly` view for your team, and only giving access to `New entry` to administrators.
 
+The `Win_dl`, `Mac_dl` `Android_dl` and `Linux_dl` must point to the filename in their respective `games` subdirectory, OR point to a URL.
+
 > **Note:** The `Note` column allows for unescaped HTML, which allows inputting relevant links or additional files. For example:<br>
 > `<a href="games/Windows/MyGame-DLC.zip">DLC</a>` or `<a href="https://<external-site>.pdf">PDF Manual</a>`.
 >
