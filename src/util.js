@@ -88,10 +88,10 @@ function getGameList(db_file) {
 
       // Download buttons / URLs
       if (row.Url)        {o[key]["url"]        = row.Url}
-      if (row.Win_dl)     {o[key]["win_dl"]     = `/games/Windows/${row.Win_dl}`}
-      if (row.Mac_dl)     {o[key]["mac_dl"]     = `/games/Mac/${row.Mac_dl}`}
-      if (row.Linux_dl)   {o[key]["linux_dl"]   = `/games/Linux/${row.Linux_dl}`}
-      if (row.Android_dl) {o[key]["android_dl"] = `/games/Android/${row.Android_dl}`}
+      if (row.Win_dl)     {let p1 = row.Win_dl.includes('://') ? '' : '/games/Windows/';     o[key]["win_dl"]     = `${p1}${row.Win_dl}`}
+      if (row.Mac_dl)     {let p1 = row.Mac_dl.includes('://') ? '' : '/games/Mac/';         o[key]["mac_dl"]     = `${p1}${row.Mac_dl}`}
+      if (row.Linux_dl)   {let p1 = row.Linux_dl.includes('://') ? '' : '/games/Linux/';     o[key]["linux_dl"]   = `${p1}${row.Linux_dl}`}
+      if (row.Android_dl) {let p1 = row.Android_dl.includes('://') ? '' : '/games/Android/'; o[key]["android_dl"] = `${p1}${row.Android_dl}`}
 
       // Categories
       o[key]["category"] = []
