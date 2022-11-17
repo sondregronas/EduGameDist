@@ -3,11 +3,11 @@ block variables
   - var title = gameData['title']
 
 block head
-  meta(name='og:title' content=gameData['title'])
-  meta(name='og:type' content='website')
-  meta(name='og:description' content=gameData['description'])
-  meta(name='og:image' content=gameData['cover'])
-  meta(name='og:url' content=gameData['href'])
+  meta(property='og:title' content=gameData['title'])
+  meta(property='og:type' content='website')
+  meta(name='description' property='og:description' content=gameData['description'])
+  meta(property='og:image' content=gameData['cover'])
+  meta(property='og:url' content=gameData['href'])
 
 block content
   #game-container
