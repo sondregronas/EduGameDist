@@ -1,5 +1,5 @@
 // Variabler
-const port = process.env.PORT || 80
+const port = process.env.PORT || 81
 const db_file = './db/gamedb.db'
 
 // Dependencies
@@ -20,9 +20,13 @@ if (process.env.NODE_ENV === 'dev') { util.devMode(app) }
 
 app.get('/*', async (req, res) => {
   let url = req.url.replace(/^\/+/, '')
-  let href = req.protocol + '://' + req.get('host') + req.originalUrl
+  let base_url = req.protocol + '://' + req.get('host')
+  let abs_url = base_url + req.originalUrl
 
-  if (pugData.gameList[url]) { pugData.gameData = pugData.gameList[url]; pugData.gameData.href = href; url = 'game'}
+  if (pugData.gameList[url]) { pugData.gameData = pugData.gameList[url];
+                               pugData.gameData.base_url = base_url;
+                               pugData.gameData.abs_url = abs_url;
+                               url = 'game' }
   else if (url === '') { url = 'index' }
 
   try {
