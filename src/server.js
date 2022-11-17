@@ -1,5 +1,5 @@
 // Variabler
-const port = process.env.PORT || 81
+const port = process.env.PORT || 80
 const db_file = './db/gamedb.db'
 
 // Dependencies
