@@ -2,6 +2,11 @@ extends templates/layout.pug
 block variables
   - var title = gameData['title']
 
+block head
+  meta(name='og:title' content=gameData['title'])
+  meta(name='og:description' content=gameData['description'])
+  meta(name='og:image' content=gameData['cover'])
+
 block content
   #game-container
     img.game-cover(src=gameData['cover'])
