@@ -20,8 +20,9 @@ if (process.env.NODE_ENV === 'dev') { util.devMode(app) }
 
 app.get('/*', async (req, res) => {
   let url = req.url.replace(/^\/+/, '')
+  let href = req.protocol + '://' + req.get('host') + req.originalUrl
 
-  if (pugData.gameList[url]) { pugData.gameData = pugData.gameList[url]; url = 'game'}
+  if (pugData.gameList[url]) { pugData.gameData = pugData.gameList[url]; pugData.gameData.href = href; url = 'game'}
   else if (url === '') { url = 'index' }
 
   try {

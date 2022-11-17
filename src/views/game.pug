@@ -4,8 +4,10 @@ block variables
 
 block head
   meta(name='og:title' content=gameData['title'])
+  meta(name='og:type' content='website')
   meta(name='og:description' content=gameData['description'])
   meta(name='og:image' content=gameData['cover'])
+  meta(name='og:url' content=gameData['href'])
 
 block content
   #game-container
