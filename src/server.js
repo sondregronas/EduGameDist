@@ -24,10 +24,12 @@ app.get('/*', async (req, res) => {
   if (pugData.gameList[url]) { pugData.gameData = pugData.gameList[url]; url = 'game'}
   else if (url === '') { url = 'index' }
 
-  res.render(url, pugData, (err, html) => {
-    if (err) { res.redirect(`/`) }
-    else { res.send(html) }
-  })
+  try {
+    res.render(url, pugData, (err, html) => {
+      if (err) { throw(err) }
+      else { res.send(html) }
+    })
+  } catch (err) { console.error(err); res.redirect(`/`) }
 
   // Reload db entries
   pugData.gameList = util.getGameList(db_file, pugData)
