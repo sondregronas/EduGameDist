@@ -2,6 +2,16 @@ extends templates/layout.pug
   
 block content
   include cfg/header
+  #filter
+      input(type="text" id="search" placeholder="Søk etter spill")
+      input(type="checkbox" class="filterBtn mdi mdi-web")
+      input(type="checkbox" class="filterBtn mdi mdi-microsoft-windows")
+      input(type="checkbox" class="filterBtn mdi mdi-apple")
+      input(type="checkbox" class="filterBtn mdi mdi-linux")
+      input(type="checkbox" class="filterBtn mdi mdi-android")
+  #no-results
+    h1 😔
+    p Her var det tomt, gitt!
   #game-grid
     each game, link in gameList
       a#game-grid-card(href=link)
