@@ -358,6 +358,21 @@
   color: var(--color-ff-primary);
 }
 
-.hidden-platform, .hidden-search{
-  display: none!important;
+#game-grid-card.hidden-platform, #game-grid-card.hidden-search{
+  display: none;
+}
+
+#game-grid-card:not(.hidden-platform):not(.hidden-search){
+  animation: fadeIn .25s ease-in-out forwards;
+}
+
+@keyframes fadeIn {
+  0% {
+    opacity: 50%;
+    transform: scale(0.5);
+  }
+  100% {
+    opacity: 1;
+    transform: scale(1);
+  }
 }
