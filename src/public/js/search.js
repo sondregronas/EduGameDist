@@ -71,3 +71,13 @@ function checkAllHidden(){
         document.getElementById('no-results').style.display = 'none'
     }
 }
+
+// check state of checkboxes and search bar on page load
+window.onload = function() {
+    document.querySelectorAll('.filterBtn').forEach((btn) => {
+        if (btn.checked) {
+            btn.dispatchEvent(new Event('change'))
+        }
+    })
+    document.getElementById('search').dispatchEvent(new Event('input'))
+}
