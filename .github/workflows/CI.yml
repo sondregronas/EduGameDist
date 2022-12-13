@@ -16,6 +16,8 @@ on:
     paths-ignore:
       - 'README.md'
       - 'docker-compose.yml'
+      - 'src/demo.js'
+      - 'src/demo-img.js'
 
 jobs:
   build:

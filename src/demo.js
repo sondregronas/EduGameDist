@@ -99,18 +99,27 @@ pugData.gameList[game3.title.replace(/ /g, '-').replace(/:/g, '')] = game3
 pugData.gameList[game4.title.replace(/ /g, '-').replace(/:/g, '')] = game4
 
 function main() {
-    const html = pug.renderFile('views/index.pug', pugData)
-
     fs.mkdirSync('demo', { recursive: true })
     util.copyFolderSync('public', 'demo')
 
+    let nocodb_placeholder = `href="/" onmouseover="javascript:event.target.port=8080"`
+    let nocodb_replacement = `href="https://github.com/nocodb/nocodb" onclick="alert('Demo is currently not available, redirecting to the NocoDB GitHub page.')"`
+    let games = `href="/"`
+    let games_replacement = `href="/EduGameDist"`
+
+    let html = pug.renderFile('views/index.pug', pugData)
+    html = html.replace(nocodb_placeholder, nocodb_replacement)
+    html = html.replace(games, games_replacement)
     fs.writeFile('demo/index.html', html, function (err) {if (err) throw err})
 
     Object.values(pugData.gameList).forEach(function (game) {
         pugData.gameData = game
-        // TODO: Replace "Nocodb" link with a demo link to nocodb
-        let html = pug.renderFile('views/game.pug', pugData)
+        // TODO: Replace "Nocodb" link with an actual demo for nocodb
         let fname = game.title.replace(/ /g, '-').replace(/:/g, '')
+
+        let html = pug.renderFile('views/game.pug', pugData)
+        html = html.replace(nocodb_placeholder, nocodb_replacement)
+        html = html.replace(games, games_replacement)
         fs.writeFile(`demo/${fname}.html`, html, function (err) {if (err) throw err})
     })
 }
