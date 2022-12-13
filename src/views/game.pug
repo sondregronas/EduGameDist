@@ -48,10 +48,9 @@ block content
           a.download-button(href=gameData.url) Nettleser <i class="mdi mdi-web"></i>
 
     #game-footer
-      p Spillene kan ikke deles med andre eller forlate klasserommet.
+      p Når du laster ned innhold fra denne siden, aksepterer du <a id="tc-link">vilkår og betingelsene</a>.
       if gameData['links'][0]
-        p Du kan kjøpe spillet selv på en av følgende plattformer:
-
+        p Du kan lese mer om eller kjøpe spillet selv på en av følgende plattformer:
         // Links
         #game-purchase-links
           each link in gameData['links']
@@ -71,3 +70,9 @@ block content
               a.game-link(href=link target="_blank") <i class="fab fa-itch-io"></i>
             else
               a.game-link(href=link target="_blank") <i class="mdi mdi-link-variant"></i>
+
+  #tc-modal.hidden
+    .modal-content
+      .close-modal
+        i.mdi.mdi-close
+      include cfg/tc
