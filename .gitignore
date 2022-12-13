@@ -129,3 +129,4 @@ dist
 .idea/
 gamedb.db
 src/public/img/
+src/demo/
