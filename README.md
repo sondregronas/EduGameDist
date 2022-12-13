@@ -1,4 +1,5 @@
-# EduGameDist (<a href="https://vaagenim.github.io/spill.iktim.no/">Old demo</a>)
+# EduGameDist (<a href="https://sondregronas.github.io/EduGameDist/">Demo</a>)
+[![GitHub Pages](https://badgen.net/badge/demo/github%20pages/?icon=chrome)](https://sondregronas.github.io/EduGameDist/)
 [![Build Status](https://img.shields.io/github/workflow/status/sondregronas/EduGameDist/CI)](https://github.com/sondregronas/EduGameDist/)
 [![GitHub latest commit](https://img.shields.io/github/last-commit/sondregronas/EduGameDist)](https://github.com/sondregronas/EduGameDist/commit/)
 
