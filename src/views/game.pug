@@ -48,9 +48,9 @@ block content
           a.download-button(href=gameData.url) Nettleser <i class="mdi mdi-web"></i>
 
     #game-footer
-      p Når du laster ned innhold fra denne siden, aksepterer du <a id="tc-link">vilkår og betingelsene</a>.
+      p Når du laster ned innhold fra denne siden, aksepterer du disse <a id="tc-link">vilkårene og betingelsene</a>.
       if gameData['links'][0]
-        p Du kan lese mer om eller kjøpe spillet selv på en av følgende plattformer:
+        p Du kan lese mer om, eller kjøpe spillet på en av følgende plattformer:
         // Links
         #game-purchase-links
           each link in gameData['links']
