@@ -2,7 +2,7 @@
     display: none;
 }
 
-body:not(:has(.hidden)) {
+body:has(#tc-modal:not(.hidden)) {
     overflow: hidden;
 }
 
