@@ -31,10 +31,24 @@ jobs:
           node-version: 16
 
       - name: Install dependencies
-        run: cd src && npm install
+        working-directory: ./src
+        run: npm install
 
       - name: Build Demo
-        run: cd src && node demo.js
+        working-directory: ./src
+        run: node demo.js
+
+      - name: Install Python
+        uses: actions/setup-python@v3
+        with:
+          python-version: 3.10
+
+      - name: Build MkDocs
+        working-directory: ./docs
+        run: |
+          pip install -r requirements.txt
+          mkdocs build
+          cp -R site/ ../src/demo/docs
 
       - name: Deploy to GitHub Pages
         uses: JamesIves/github-pages-deploy-action@releases/v4
