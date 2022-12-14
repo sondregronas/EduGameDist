@@ -1,7 +1,7 @@
 # Adding games
 To add a game, login to the backend and click on the `Games` table within the `Games` database. On the right side of the screen, click on the `New entry` button to add a new game. Fill out the fields and click `Submit`.
 
-![img.png](_attachments/new_entry.png)
+![[new_entry.png]]
 
 The game will be available on the frontend within 15 minutes.
 
