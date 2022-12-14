@@ -2,6 +2,7 @@ const fs = require('fs')
 const path = require('path')
 const sqlite3 = require("sqlite3");
 
+// This function copies all files from a folder to another recursively, which is used for the docker image
 function copyFolderSync(from, to) {
     try {fs.mkdirSync(to, { recursive: true })} catch {}
     fs.readdirSync(from).forEach(element => {
@@ -15,6 +16,7 @@ function copyFolderSync(from, to) {
     });
 }
 
+// Spin up a development server, which reloads on file changes
 function devMode(app) {
   console.log('WARNING: Dev mode initialized.')
   const path = require('path')
@@ -35,6 +37,8 @@ function serializeDB(db_file) {
     // if folder to db_file does not exist, create it
     let db_folder = path.dirname(db_file)
     if (!fs.existsSync(db_folder)) { fs.mkdirSync(db_folder, { recursive: true }) }
+
+    // Connect and load table 'games', then serialize
     const db = new sqlite3.Database(db_file)
     db.serialize(() => {
       db.run("CREATE TABLE IF NOT EXISTS games (" +
@@ -64,7 +68,7 @@ function serializeDB(db_file) {
     db.close()
 }
 
-// Hent data fra database
+// Fetch game list from database, and return it as an object
 function getGameList(db_file) {
   let o = {}
 

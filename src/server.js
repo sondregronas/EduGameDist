@@ -35,10 +35,10 @@ app.get('/*', async (req, res) => {
       else { res.send(html) }
     })
   } catch (err) { console.error(err); res.redirect(`/`) }
-
-  // Reload db entries
-  pugData.gameList = util.getGameList(db_file, pugData)
 })
+
+// Update game list every 15 minutes in the background
+setInterval(() => { pugData.gameList = util.getGameList(db_file, pugData) }, 1000 * 60 * 15)
 
 // Start app
 app.listen(port, () => {
