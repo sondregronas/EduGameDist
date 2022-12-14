@@ -18,6 +18,11 @@ jobs:
     steps:
       - name: Checkout repository
         uses: actions/checkout@v3
+        
+      - name: Move Demo to src
+        run: |
+          cp .github/workflows/demo.js src/
+          cp .github/workflows/demo-img.js src/
 
       - name: Install Node.js
         uses: actions/setup-node@v3
