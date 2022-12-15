@@ -17,13 +17,11 @@ services:
     image: ghcr.io/sondregronas/edugamedist
     restart: unless-stopped
     ports:
-      - "80:80"
+      - 80:80
     volumes:
       - ./games:/app/public/games
-      # /app/db is required for persistent storage
       - ./db:/app/db
       - ./db/nc/uploads/noco/Games/Games/Cover:/app/public/img
-      # Personalization options
       - ./cfg:/app/public/cfg
       - ./cfg:/app/views/cfg
     environment:
@@ -32,7 +30,7 @@ services:
     image: nocodb/nocodb
     restart: unless-stopped
     ports:
-      - "8080:8080"
+      - 8080:8080
     volumes:
       - ./db:/usr/app/data/
 ```

@@ -1,7 +1,12 @@
 const fs = require('fs')
 const pug = require('pug')
 const util = require('./util')
-const pugData = {title: 'EduGameDist Demo', gameList: {}, gameData: {}}
+const pugData = {
+    title: 'EduGameDist Demo',
+    base_url: 'https://sondregronas.github.io/EduGameDist',
+    gameList: {},
+    gameData: {}
+}
 
 
 const basegame = {
@@ -21,11 +26,11 @@ const basegame = {
   developer: 'Sondre Grønås',
   developer_link: 'https://github.com/sondregronas',
 
-  url: '#',
-  win_dl: '#',
-  mac_dl: '#',
-  linux_dl: '#',
-  android_dl: '#',
+  url: '',
+  win_dl: '',
+  mac_dl: '',
+  linux_dl: '',
+  android_dl: '',
 
   links: [
     'https://steampowered.com',
@@ -41,9 +46,8 @@ fakegame = Object.assign({}, basegame, {
     description: 'Explore the world of Fake: Game, a game about nothing.',
     note: 'You can add personalized notes, with <a href="#">links</a> and other <b>HTML</b> tags.',
     cover: 'fakegame.png',
-    url: '',
-    linux_dl: '',
-    android_dl: ''
+    win_dl: '#',
+    mac_dl: '#'
 })
 
 nonexistant = Object.assign({}, basegame, {
@@ -58,9 +62,8 @@ nonexistant = Object.assign({}, basegame, {
         'Game'
     ],
     links: [],
-    win_dl: '',
-    mac_dl: '',
-    android_dl: ''
+    url: '#',
+    linux_dl: '#'
 })
 
 sample2 = Object.assign({}, basegame, {
@@ -73,6 +76,11 @@ sample2 = Object.assign({}, basegame, {
         'Sample',
         'Game'
     ],
+    win_dl: '#',
+    mac_dl: '#',
+    linux_dl: '#',
+    android_dl: '#',
+    url: '#'
 })
 
 spacefiller3 = Object.assign({}, basegame, {
@@ -85,10 +93,7 @@ spacefiller3 = Object.assign({}, basegame, {
         'Space',
         'Filling'
     ],
-    win_dl: '',
-    mac_dl: '',
-    linux_dl: '',
-    android_dl: ''
+    url: '#'
 })
 
 oslo2084 = Object.assign({}, basegame, {
@@ -105,10 +110,6 @@ oslo2084 = Object.assign({}, basegame, {
     developer: 'Anansi',
     developer_link: 'https://demokrativerksted.no/spill',
     url: 'https://anansigames.itch.io/oslo2084',
-    win_dl: '',
-    mac_dl: '',
-    linux_dl: '',
-    android_dl: '',
     links: [
         'https://anansigames.itch.io/oslo2084'
     ]
@@ -117,7 +118,7 @@ oslo2084 = Object.assign({}, basegame, {
 pugData.gameList = {
     'Fake-Game': fakegame,
     'Non-Existant': nonexistant,
-    'Oslo2084': oslo2084,
+    'Oslo-2084': oslo2084,
     'Sample-2': sample2,
     'Space-Filler-3': spacefiller3
 }
