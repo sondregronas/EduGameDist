@@ -1,4 +1,4 @@
 src/node_modules
 src/db/gamedb.db
+src/demo
 src/demo.js
-src/demo-img.js

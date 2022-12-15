@@ -1,7 +1,6 @@
 const fs = require('fs')
 const pug = require('pug')
 const util = require('./util')
-const demoImg = require('./demo-img')
 const pugData = {title: 'EduGameDist Demo', gameList: {}, gameData: {}}
 
 
@@ -9,7 +8,7 @@ const basegame = {
   title: 'Title',
   description: 'Description',
   note: '',
-  cover: demoImg.img1,
+  cover: 'cover.png',
 
   ttb: '10 min',
   players: '1',
@@ -41,7 +40,7 @@ fakegame = Object.assign({}, basegame, {
     title: 'Fake: Game',
     description: 'Explore the world of Fake: Game, a game about nothing.',
     note: 'You can add personalized notes, with <a href="#">links</a> and other <b>HTML</b> tags.',
-    cover: demoImg.fakegame,
+    cover: 'fakegame.png',
     url: '',
     linux_dl: '',
     android_dl: ''
@@ -50,7 +49,7 @@ fakegame = Object.assign({}, basegame, {
 nonexistant = Object.assign({}, basegame, {
     title: 'Non-Existant',
     description: 'This game does not exist, nor do the associated links.',
-    cover: demoImg.nonexistant,
+    cover: 'nonexistant.png',
     players: '1',
     ttb: '5 min',
     developer_link: undefined,
@@ -67,7 +66,7 @@ nonexistant = Object.assign({}, basegame, {
 sample2 = Object.assign({}, basegame, {
     title: 'Sample 2',
     description: 'This is a sample game.',
-    cover: demoImg.sample2,
+    cover: 'sample2.png',
     players: '1+',
     ttb: '3 hours',
     category: [
@@ -79,7 +78,7 @@ sample2 = Object.assign({}, basegame, {
 spacefiller3 = Object.assign({}, basegame, {
     title: 'Space Filler 3',
     description: 'Meet the Space Filler 3, a game filling the space of an otherwise empty game list.',
-    cover: demoImg.spacefiller3,
+    cover: 'spacefiller3.png',
     players: '2-8',
     ttb: '30 min',
     category: [
@@ -96,7 +95,7 @@ oslo2084 = Object.assign({}, basegame, {
     title: 'Oslo 2084',
     description: `I Oslo 2084 styrer spilleren Embla, en ung jente som bruker tiden sin på hobbyhacking og programmering av sin egen robotvenn, støvsugeren Moppy. I Oslo 2084 er byen i stadig større grad styrt av kunstig intelligens og ny teknologi. Embla og Moppy må løse ulike utfordringer og demokratiske dilemma for å bevege seg gjennom de ulike nivåene i spillet og kjempe mot anti-demokratiske krefter.`,
     note: `Fra Demokrativerksted hos Utøya (Europeiske Wergeland Centre).<br><a href="https://theewc.org/content/uploads/sites/7/2021/10/Hefte-Oslo-2084-1-1.pdf">Trykk her for Ressurshefte.pdf</a>`,
-    cover: demoImg.oslo2084,
+    cover: 'oslo2084.png',
     ttb: '45 min',
     players: '1',
     category: [
@@ -115,12 +114,17 @@ oslo2084 = Object.assign({}, basegame, {
     ]
 })
 
+pugData.gameList = {
+    'Fake-Game': fakegame,
+    'Non-Existant': nonexistant,
+    'Oslo2084': oslo2084,
+    'Sample-2': sample2,
+    'Space-Filler-3': spacefiller3
+}
 
-pugData.gameList[fakegame.title.replace(/ /g, '-').replace(/:/g, '')] = fakegame
-pugData.gameList[nonexistant.title.replace(/ /g, '-').replace(/:/g, '')] = nonexistant
-pugData.gameList[oslo2084.title.replace(/ /g, '-').replace(/:/g, '')] = oslo2084
-pugData.gameList[sample2.title.replace(/ /g, '-').replace(/:/g, '')] = sample2
-pugData.gameList[spacefiller3.title.replace(/ /g, '-').replace(/:/g, '')] = spacefiller3
+pugData.gameList = Object.fromEntries(
+    Object.entries(pugData.gameList).sort()
+)
 
 function main() {
     fs.mkdirSync('demo', { recursive: true })

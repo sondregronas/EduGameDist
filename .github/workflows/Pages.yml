@@ -6,7 +6,7 @@ on:
     tags: [v*]
     paths-ignore:
       - 'README.md'
-      - 'CONTIBUTING.md'
+      - 'CONTRIBUTING.md'
       - 'docker-compose.yml'
 
 jobs:
@@ -36,7 +36,9 @@ jobs:
 
       - name: Build Demo
         working-directory: ./src
-        run: node demo.js
+        run: |
+          node demo.js
+          cp -R ../.github/workflows/demo-img/* demo/
 
       - name: Install Python
         uses: actions/setup-python@v3
