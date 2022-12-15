@@ -8,7 +8,7 @@ const pugData = {
 }
 
 const basegame = {
-  base_url: 'https://sondregronas.github.io/EduGameDist/demo',
+  base_url: 'https://sondregronas.github.io/EduGameDist',
 
   title: 'Title',
   description: 'Description',
