@@ -17,7 +17,7 @@ services:
     image: ghcr.io/sondregronas/edugamedist
     restart: unless-stopped
     ports:
-      - "80:80"
+      - 80:80
     volumes:
       - ./games:/app/public/games
       # /app/db is required for persistent storage
