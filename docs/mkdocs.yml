@@ -109,5 +109,7 @@ nav:
     - Usage:
       - Adding games: Usage/Adding-games.md
       - Modifying games: Usage/Modifying-games.md
+    - Gallery:
+      - NocoDB: Gallery/Nocodb.md
     - Updating: Updating.md
     - Demo: /EduGameDist

@@ -127,7 +127,7 @@ function main() {
     util.copyFolderSync('public', 'demo')
 
     let nocodb_placeholder = `href="/" onmouseover="javascript:event.target.port=8080"`
-    let nocodb_replacement = `href="https://github.com/nocodb/nocodb" onclick="alert('Demo is currently not available, redirecting to the NocoDB GitHub page.')"`
+    let nocodb_replacement = `href="https://sondregronas.github.io/EduGameDist/docs/Gallery/Nocodb" target="_blank"`
     let games = `href="/"`
     let games_replacement = `href="/EduGameDist"`
 
