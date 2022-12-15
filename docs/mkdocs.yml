@@ -13,7 +13,6 @@ copyright: >
 theme:
     name: material
     custom_dir: overrides
-    language: 'no'
 
     palette:  # Light/Dark Mode
     - media: "(prefers-color-scheme: light)"  # Light mode
