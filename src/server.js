@@ -29,6 +29,8 @@ app.get('/*', async (req, res) => {
     let base_url = req.protocol + '://' + req.get('host')
     let abs_url = base_url + req.originalUrl
 
+    pugData['base_url'] = base_url
+
     if (pugData.gameList[url]) {
         pugData.gameData = pugData.gameList[url];
         pugData.gameData.base_url = base_url;
