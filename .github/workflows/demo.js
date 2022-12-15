@@ -3,13 +3,13 @@ const pug = require('pug')
 const util = require('./util')
 const pugData = {
     title: 'EduGameDist Demo',
-    base_url: 'https://sondregronas.github.io/EduGameDist',
     gameList: {},
     gameData: {}
 }
 
-
 const basegame = {
+  base_url: 'https://sondregronas.github.io/EduGameDist/demo',
+
   title: 'Title',
   description: 'Description',
   note: '',
