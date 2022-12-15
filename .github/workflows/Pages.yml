@@ -10,8 +10,8 @@ on:
       - 'docker-compose.yml'
 
 jobs:
-  build-demo:
-    name: Generate Demo
+  build-gh-pages:
+    name: Build GH Pages
     runs-on: ubuntu-latest
     permissions:
       contents: write
