@@ -6,7 +6,7 @@
 
 Simple game distribution for schools. Dockerized and ready to deploy.
 
-![Frontend](frontend.png)
+![Frontend](assets/frontend.png)
 
 > **Note:** Parts of this project is in Norwegian, as it was made for a Norwegian school, you may need to modify all `.pug` files in the `views` folder by uncommenting the volume mount in the `docker-compose.yml` file. This will allow you to edit the files directly on your host machine, and the changes will be reflected in the container.
 
