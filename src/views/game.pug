@@ -36,6 +36,8 @@ block content
 
     #game-download-area
       #game-download-container
+        if gameData.url
+          a.download-button(href=gameData.url) Nettleser <i class="mdi mdi-web"></i>
         if gameData.win_dl
           a.download-button(href=gameData.win_dl) Windows <i class="mdi mdi-microsoft-windows"></i>
         if gameData.mac_dl
@@ -44,8 +46,6 @@ block content
           a.download-button(href=gameData.linux_dl) Linux <i class="mdi mdi-linux"></i>
         if gameData.android_dl
           a.download-button(href=gameData.android_dl) Android <i class="mdi mdi-android"></i>
-        if gameData.url
-          a.download-button(href=gameData.url) Nettleser <i class="mdi mdi-web"></i>
 
     #game-footer
       p Når du laster ned innhold fra denne siden, aksepterer du disse <a id="tc-link">vilkårene og betingelsene</a>.
@@ -68,6 +68,8 @@ block content
               a.game-link(href=link target="_blank") <i class="mdi mdi-google-play"></i>
             else if (link.includes('itch.io'))
               a.game-link(href=link target="_blank") <i class="fab fa-itch-io"></i>
+            else if (link.includes('github'))
+              a.game-link(href=link target="_blank") <i class="fab fa-github"></i>
             else
               a.game-link(href=link target="_blank") <i class="mdi mdi-link-variant"></i>
 

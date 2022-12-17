@@ -26,7 +26,7 @@ block content
             .game-card-cover-info
                 if game.players
                     .players
-                        span.mdi(class=game.players === "1" ? "mdi-account" : "mdi-account-group")
+                        span.mdi(class=game.players === "1" ? "mdi-account": "mdi-account-group")
                         span.playercount=game.players
                 .platforms
                     if game.url

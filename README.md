@@ -6,7 +6,7 @@
 
 Simple game distribution for schools. Dockerized and ready to deploy.
 
-![Frontend](assets/frontend.gif)
+![Frontend](frontend.png)
 
 > **Note:** Parts of this project is in Norwegian, as it was made for a Norwegian school, you may need to modify all `.pug` files in the `views` folder by uncommenting the volume mount in the `docker-compose.yml` file. This will allow you to edit the files directly on your host machine, and the changes will be reflected in the container.
 
@@ -18,7 +18,7 @@ While this project allows for managing distribution of games or any files over t
 ## Simple NocoDB Backend
 The backend is powered by [NocoDB](https://nocodb.com/), a simple and easy to use database management tool.
 
-![Backend](assets/backend.gif)
+![Backend](assets/backend.png)
 
 ## Contributing
 Refer to [CONTRIBUTING.md](CONTRIBUTING.md) for more information.
