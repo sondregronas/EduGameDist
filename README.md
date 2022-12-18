@@ -8,7 +8,7 @@
 
 Simple game distribution for schools. Dockerized and ready to deploy.
 
-![Frontend Preview](.github/media/preview.webp)
+<img src=".github/media/preview.webp" width="50%">
 
 </div>
 
@@ -21,9 +21,9 @@ While this project allows for managing distribution of games or any files over t
 Please refer to the [documentation](https://sondregronas.github.io/EduGameDist/docs) on [how to install](https://sondregronas.github.io/EduGameDist/docs/Installation/docker/) and [use](https://sondregronas.github.io/EduGameDist/docs/Usage/Adding-games/) this project.
 
 ## Educator friendly NocoDB Backend
-The backend is powered by [NocoDB](https://nocodb.com/), a simple and easy to use database management tool.
+The backend is powered by [NocoDB](https://nocodb.com/), a simple and easy to use database management tool. [Click here for a preview.](https://sondregronas.github.io/EduGameDist/docs/Gallery/Nocodb/)
 
-![Backend Preview](.github/media/preview_db.webp)
+<img src=".github/media/preview_db.webp" width="40%">
 
 ## Contributing
 Refer to [CONTRIBUTING.md](CONTRIBUTING.md) for more information.
