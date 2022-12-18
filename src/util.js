@@ -80,6 +80,27 @@ function serializeDB(db_file) {
     db.close()
 }
 
+// Parse cover image from database and return it as "img/<file_path>" or data:image/png;base64,<base64>
+function getCover(row) {
+    let cover = row ? row : null
+    // If cover is from NocoDB, find the filename based on the URL
+    try {
+        // Nocodb stores urls as "https://<domain>/download/<project>/<table>/Cover/<file_path>"
+        // We only need the file_path, which is the last part of the URL.
+        // Within the docker-compose.yml file, we can map the nocodb upload folder to the /img folder,
+        // which we want to use for the cover images instead of the database.
+        return 'img/' + JSON.parse(row)[0].url.match(/\/download\/.+\/.+\/.+\/Cover\/(.*)/)[1]
+    } catch {}
+    // If cover is an object, convert it to a file
+    if (typeof cover === 'object' && cover !== null) {
+        if (!cover.toString().startsWith('data:image')) {
+            return 'data:image/jpeg;base64,' + cover.toString('base64')
+        }
+    }
+    return cover
+}
+
+
 // Fetch game list from database, and return it as an object
 function getGameList(db_file) {
     let o = {}
@@ -99,7 +120,7 @@ function getGameList(db_file) {
                 title: row.Title,
                 description: row.Description,
                 note: row.Note || '',
-                cover: 'img/' + JSON.parse(row.Cover)[0].url.split('/download/noco/Games/Games/Cover/')[1],
+                cover: getCover(row.Cover),
                 ttb: row.Time,
                 players: row.Players,
                 category: [
