@@ -6,7 +6,8 @@
 [![Build Status](https://img.shields.io/github/actions/workflow/status/sondregronas/EduGameDist/CI.yml?branch=main)](https://github.com/sondregronas/EduGameDist/)
 [![GitHub latest commit](https://img.shields.io/github/last-commit/sondregronas/EduGameDist)](https://github.com/sondregronas/EduGameDist/commit/)
 
-Simple game distribution for schools. Dockerized and ready to deploy.
+Simple game distribution for schools, dockerized and ready to deploy.
+<br>[Click here for a demo.](https://sondregronas.github.io/EduGameDist/)
 
 <img src=".github/media/preview.webp" width="50%">
 
