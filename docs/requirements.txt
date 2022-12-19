@@ -4,6 +4,6 @@ mkdocs-roamlinks-plugin
 mkdocs-include-dir-to-nav
 mkdocs-exclude
 mkdocs-callouts
-# mdx-breakless-lists
+git+https://github.com/sondregronas/mdx-breakless-lists@master
 mkdocs-minify-plugin
 mkdocs-glightbox
