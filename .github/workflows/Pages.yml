@@ -46,6 +46,7 @@ jobs:
       - name: Build MkDocs
         working-directory: ./docs
         run: |
+          pip install setuptools wheel
           pip install -r requirements.txt
           mkdocs build
           cp -R site/ ../src/demo/docs
