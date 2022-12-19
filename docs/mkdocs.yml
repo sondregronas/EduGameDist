@@ -57,7 +57,7 @@ markdown_extensions:
   - meta                        # Load frontmatter (---\ntitle: Title\n---
   - attr_list                   # Add HTML attributes to anything (![image](link) { align=left })
   - nl2br                       # All linebreaks add <br> tags (starts new line on new lines...)
-  - mdx_breakless_lists         # single linebreak required for lists, instead of two
+  # - mdx_breakless_lists         # single linebreak required for lists, instead of two
   - pymdownx.magiclink          # Automatically wrap links to <a> tags https://google.com = <a href="https://google.com">https://google.com</a>
 
   # Features

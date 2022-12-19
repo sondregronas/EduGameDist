@@ -12,6 +12,7 @@ Supports search, sorting, pagination, and filtering. You can also add new games 
 Provides a card view of the games. This view is more user-friendly, but has limited editing capabilities, perfect for teachers that don't want to mess with the database.
 
 By default, this view contains the following fields:
+
 - [ ] **Title**
 - [ ] **Note**
 - [ ] **Cover**
