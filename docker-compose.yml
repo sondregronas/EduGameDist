@@ -1,38 +1,35 @@
-version: "3.3"
 services:
   frontend:
     image: ghcr.io/sondregronas/edugamedist
     restart: unless-stopped
     ports:
-      - "80:80"
+      - 80:80
     volumes:
-      # Note, you can also bind any folder to a network share or different directories
-      - ./games:/app/public/games
+      # Game installer locations
+      - ./games/Windows:/app/public/games/Windows
+      - ./games/Mac:/app/public/games/Mac
+      - ./games/Linux:/app/public/games/Linux
+      - ./games/Android:/app/public/games/Android
 
-      # You can alternatively bind the platforms separately
-      # ./Windows:/app/public/games/Windows
-      # ./Mac:/app/public/games/Mac
-      # ./Linux:/app/public/games/Linux
-      # ./Android:/app/public/games/Android
-
-      # /app/db is required for persistent storage
-      - ./db:/app/db
-      - ./db/nc/uploads/noco/Games/Games/Cover:/app/public/img
-
-      # public/cfg = favicon and css overrides
+      # Configuration files
       - ./cfg:/app/public/cfg
-      # Uncomment for full CSS access
+      - ./cfg/views:/app/views/cfg  # (remove trailing /cfg if you want access to all views)
       # - ./cfg/css:/app/public/css
 
-      # Choose between the header/footer/nav-menu, or the entire views folder (Advanced).
-      - ./cfg:/app/views/cfg
-      # - ./cfg/views:/app/views
+      # Persistent data, leave as is or map to a local folder
+      - game_db:/app/db
+      - game_covers:/app/public/img
     environment:
       - TITLE=Game Server
   db:
     image: nocodb/nocodb
     restart: unless-stopped
     ports:
-      - "8080:8080"
+      - 8080:8080
     volumes:
-      - ./db:/usr/app/data/
+      # Persistent data, leave as is or map to a local folder
+      - game_db:/usr/app/data/
+      - game_covers:/usr/app/data/nc/uploads/noco/Games/Games/Cover
+volumes:
+  game_db:
+  game_covers:
