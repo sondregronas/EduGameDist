@@ -106,9 +106,15 @@ nav:
       - Backend: Installation/Backend.md
       - Access: Installation/Access.md
     - Usage:
+      - Terms and Conditions: Usage/Terms-and-Conditions.md
+      - Acquiring games: Usage/Acquiring-games.md
       - Adding games: Usage/Adding-games.md
       - Modifying games: Usage/Modifying-games.md
     - Gallery:
       - NocoDB: Gallery/Nocodb.md
+    - Contributing:
+      - Index: Contributing/index.md
+      - Roadmap: Contributing/Roadmap.md
+      - Setup: Contributing/Setup-dev.md
     - Updating: Updating.md
     - Demo: /EduGameDist

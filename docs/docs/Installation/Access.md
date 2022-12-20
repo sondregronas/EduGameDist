@@ -14,9 +14,11 @@ To restrict access to the frontend, you can use the `Access Lists` feature in Ng
 > With the `RFC1918 Access List` in NginxProxyManager you can restrict access to your local network. This will allow you to expose the frontend to the internet, while still restricting access to your local network.
 > 
 > The IP-addresses used in the `RFC1918 Access List` are:
-> - `192.168.0.0/16`
-> - `172.16.0.0/12`
-> - `10.0.0.0/8`
+> ```
+> 192.168.0.0/16
+> 172.16.0.0/12
+> 10.0.0.0/8
+> ```
 
 ## Uploading games
 Uploading games can either be done via [network shares (Samba/CIFS)](https://support.microsoft.com/en-us/windows/file-sharing-over-a-network-in-windows-b58704b2-f53a-4b82-7bc1-80f9994725bf#:~:text=To%20share%20a%20file%20or,users%20access%20to%20the%20file.) or by using external drives. You can also use an external SFTP server.
