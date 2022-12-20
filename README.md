@@ -29,7 +29,7 @@ The backend is powered by [NocoDB](https://nocodb.com/), a simple and easy to us
 ## Contributing
 Feel free to contribute in any way you see fit. If you have questions, suggestions or ideas, please open an issue.
 
-You can read more about development in the [documentation](https://sondregronas.github.io/EduGameDist/docs/Contributing/).
+You can read more on how you can contribute in the [documentation](https://sondregronas.github.io/EduGameDist/docs/Contributing/).
 
 ## License
 This project is licensed under the MIT License - see the [LICENSE](LICENSE) file for details
