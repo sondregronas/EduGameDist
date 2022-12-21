@@ -14,7 +14,7 @@ The site would probably benefit from switching the frontend framework to somethi
 The backend is not as intuitive as it could be, which might be a problem for teachers who are not very tech-savvy. It would be nice to have a more intuitive way to manage the database. The NocoDB service is a good start, but I'd prefer to have a more integrated solution that is easier to use and maintain.
 
 ## Metadata scraping
-An integration with something like https://thegamesdb.net/ for example would be nice, where you can watch a games' folder, or select games from a list, and it will automatically add the game and relevant metadata to the database.
+An integration with something like https://thegamesdb.net/ for example would be nice, where you can watch a games' folder, or select games from a list, and it will automatically add the game and relevant metadata to the database. (Potentially via https://github.com/Sude-/lgogdownloader)
 
 ## Custom download experience
 Currently, the download experience is very basic; a single download button that downloads a single file. Most games fit for game-based learning are small enough to justify a single download button, but some games are quite large, or simply contain multiple files (such as DLC). A solution would probably either require reworking the download button to open a modal, or by switching to a desktop app.
