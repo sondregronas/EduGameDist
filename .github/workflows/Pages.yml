@@ -8,13 +8,22 @@ on:
       - 'README.md'
       - 'CONTRIBUTING.md'
       - 'docker-compose.yml'
+      
+concurrency:
+  group: "pages"
+  cancel-in-progress: true
 
 jobs:
   build-gh-pages:
     name: Build GH Pages
     runs-on: ubuntu-latest
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
     permissions:
       contents: write
+      pages: write
+      id-token: write
     if: ${{ !contains(github.event.head_commit.message, '[skip ci]') }}
     steps:
       - name: Checkout repository
@@ -50,9 +59,13 @@ jobs:
           pip install -r requirements.txt
           mkdocs build
           cp -R site/ ../src/demo/docs
+          
+      - name: Upload artifact
+        uses: actions/upload-pages-artifact@v1
+        with:
+          name: github-pages
+          path: src/demo
 
       - name: Deploy to GitHub Pages
-        uses: JamesIves/github-pages-deploy-action@releases/v4
-        with:
-          branch: gh-pages
-          folder: src/demo
+        id: deployment
+        uses: actions/deploy-pages@v1
