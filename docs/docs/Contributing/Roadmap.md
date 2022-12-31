@@ -4,11 +4,7 @@ On this page you can find the current roadmap of the project. The roadmap is a l
 Some goals might be a bit too ambitious or not feasible. If you have any suggestions, feel free to open an issue or pull request.
 
 ## UI-Redesign
-The current UI is a bit of a mess and old-fashioned. It is also not very mobile friendly (not that it is a priority, but it would be nice to have).
-
-Tags need to be renamed to something more intuitive, and the CSS needs to be cleaned up.
-
-The site would probably benefit from switching the frontend framework to something more modern, like React or Vue, but for now Express and Pug will do.
+The current UI is a bit of a mess and old-fashioned. It is also not very mobile friendly (not that it is a priority, but it would be nice to have). I will attempt to re-design the frontend using [Tailwind](https://tailwindcss.com/) when I feel more comfortable with it. Alternatively a different framework might be worth looking into, like Svelte or React.
 
 ## Backend
 The backend is not as intuitive as it could be, which might be a problem for teachers who are not very tech-savvy. It would be nice to have a more intuitive way to manage the database. The NocoDB service is a good start, but I'd prefer to have a more integrated solution that is easier to use and maintain.
