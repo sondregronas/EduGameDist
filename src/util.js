@@ -89,6 +89,9 @@ function getCover(row) {
         // We only need the file_path, which is the last part of the URL.
         // Within the docker-compose.yml file, we can map the nocodb upload folder to the /img folder,
         // which we want to use for the cover images instead of the database.
+        // TODO: Temporary hack, we need to replace nocodb with a better solution eventually
+        //       if key path is in the JSON, use it instead of the URL
+        if (JSON.parse(row)[0].path) {return 'img/' + JSON.parse(row)[0].path.match(/download\/.+\/.+\/.+\/Cover\/(.*)/)[1]}
         return 'img/' + JSON.parse(row)[0].url.match(/\/download\/.+\/.+\/.+\/Cover\/(.*)/)[1]
     } catch {}
     // If cover is an object, convert it to a file
