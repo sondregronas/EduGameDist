@@ -3,14 +3,14 @@
 from dataclasses import dataclass
 from pathlib import Path
 
-from enums import Platform
+from enums import Platform, Role
 
 
 @dataclass
 class User:
     """The base user class."""
     name: str
-    _access_level: int  # can view / edit some fields / edit all / restrict access
+    _access_level: Role
     access_level_override: int = -1
 
     @property
@@ -75,12 +75,15 @@ class GameInfo:
 @dataclass
 class Game:
     """The base game class."""
-    id: int
+    id: str  # Slug / unique name
     info: GameInfo
     files: list[GameFile]
 
+    teaching_materials: list[Path]  # relevant PDFs, images, etc.
+
     visible: bool
     pinned: bool
+    public: bool  # Some games can be distributed as "public", such as browser games.
 
     @property
     def platforms(self) -> list[Platform]:
