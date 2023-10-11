@@ -75,6 +75,7 @@ class GameInfo:
 @dataclass
 class Game:
     """The base game class."""
+    id: int
     info: GameInfo
     files: list[GameFile]
 

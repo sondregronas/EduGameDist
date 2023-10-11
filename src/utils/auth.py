@@ -9,8 +9,8 @@ from utils.errors import AuthenticationError
 from utils.models import User
 
 
-def requires_access_level(access_level: int) -> Callable:
-    """Requires the user to have the specified access level."""
+def auth_required(access_level: int = 0) -> Callable:
+    """Requires the user to be authenticated."""
 
     def decorator(func: Callable) -> Callable:
         """The decorator."""
@@ -28,17 +28,3 @@ def requires_access_level(access_level: int) -> Callable:
         return wrapper
 
     return decorator
-
-
-def auth_required(func: Callable) -> Callable:
-    """Requires the user to be authenticated."""
-
-    @wraps(func)
-    def wrapper(*args, **kwargs) -> Callable:
-        """The wrapper."""
-        user: User = flask.session.get("user")
-        if not user:
-            raise AuthenticationError("You must be logged in to access this resource.")
-        return func(*args, **kwargs)
-
-    return wrapper
