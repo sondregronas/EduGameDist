@@ -20,6 +20,7 @@ from app import create_admin_app, create_public_app
 from stores import FetchError
 from database import (
     AppMigration,
+    Category,
     Game,
     GameCategory,
     GameFile,
@@ -72,9 +73,17 @@ class EduGameDistAppTests(unittest.TestCase):
             "browser_url": "https://example.com/play",
         }
         values.update(overrides)
+        values["categories"] = self.category_ids(values["categories"])
         response = self.admin_client.post("/api/games", json=values)
         self.assertEqual(response.status_code, 201, response.get_data(as_text=True))
         return response.json["id"], response.json["slug"]
+
+    def category_ids(self, names):
+        """Categories come from the shared list; adding an existing name returns that category."""
+        return [self.admin_client.post("/api/categories", json={"name": name}).json["id"] for name in names]
+
+    def category_names(self, game_id):
+        return [category["name"] for category in self.admin_client.get(f"/api/games/{game_id}").json["categories"]]
 
     def upload(self, game_id, content, name, platform="windows"):
         return self.admin_client.post(
@@ -90,7 +99,7 @@ class EduGameDistAppTests(unittest.TestCase):
             json={
                 "title": "Updated Game",
                 "description": "Updated description",
-                "categories": ["Puzzle", "Co-op", "Classroom"],
+                "categories": self.category_ids(["Puzzle", "Co-op", "Classroom"]),
                 "store_links": [
                     "https://store.steampowered.com/app/10/",
                     "https://itch.io/game",
@@ -99,7 +108,7 @@ class EduGameDistAppTests(unittest.TestCase):
         )
         self.assertEqual(response.status_code, 200)
         game = self.admin_client.get("/api/games").json[0]
-        self.assertEqual(game["categories"], ["Puzzle", "Co-op", "Classroom"])
+        self.assertEqual([category["name"] for category in game["categories"]], ["Puzzle", "Co-op", "Classroom"])
         self.assertEqual(len(game["links"]), 2)
         with Session(self.admin.extensions["database_engine"]) as session:
             self.assertEqual(
@@ -280,7 +289,7 @@ class EduGameDistAppTests(unittest.TestCase):
         self.assertEqual(game["players"], "2-4")
         self.assertEqual(game["cover_url"], cover)
         self.assertEqual(game["title"], "Test Game")
-        self.assertEqual(game["categories"], ["Puzzle", "Adventure"])
+        self.assertEqual(self.category_names(game_id), ["Puzzle", "Adventure"])
         self.assertEqual(len(game["files"]), 2)
 
     def test_replacing_cover_upload_removes_the_old_cover_file(self):
@@ -510,11 +519,12 @@ class EduGameDistAppTests(unittest.TestCase):
         self.create_game(title="Second", categories=["puzzle"], browser_url="")
         self.upload(game_id, b"zip", "game.zip")
         page = self.public_client.get("/").get_data(as_text=True)
-        self.assertRegex(page, r'<option value="puzzle">[Pp]uzzle \(2\)</option>')
-        self.assertIn('<option value="co-op">Co-op (1)</option>', page)
-        self.assertIn('<option value="windows">Windows</option>', page)
-        self.assertIn('<option value="browser">Nettleser</option>', page)
-        self.assertNotIn('<option value="mac">', page)
+        option = r'<li class="menu-option" role="option" data-value="{}" aria-selected="false">'
+        self.assertRegex(page, option.format("puzzle") + r'<span class="menu-dot" style="--h: \d+"></span><span class="menu-text">[Pp]uzzle</span><span class="menu-count">2</span>')
+        self.assertRegex(page, option.format("co-op") + r'.*?<span class="menu-count">1</span>')
+        self.assertRegex(page, option.format("windows") + r'<svg[^>]*><use href="/assets/img/icons.svg#windows"/></svg><span class="menu-text">Windows</span>')
+        self.assertRegex(page, option.format("browser"))
+        self.assertNotIn('data-value="mac"', page)
         self.assertIn('href="/?category=puzzle"', self.public_client.get(f"/{slug}").get_data(as_text=True))
 
     def test_site_settings_change_title_front_page_and_menu(self):
@@ -548,14 +558,166 @@ class EduGameDistAppTests(unittest.TestCase):
         self.assertNotIn('class="hero-text"', page)
         self.assertIn("Spill", self.admin_client.get("/settings").get_data(as_text=True))
 
+    def test_categories_are_a_shared_list_that_games_pick_from(self):
+        first = self.admin_client.post("/api/categories", json={"name": "  Strategi  "})
+        self.assertEqual((first.status_code, first.json["name"], first.json["existing"]), (201, "Strategi", False))
+        again = self.admin_client.post("/api/categories", json={"name": "strategi"})
+        self.assertEqual((again.status_code, again.json["id"], again.json["existing"]), (200, first.json["id"], True))
+        for bad in ("", "a|b", "x" * 101):
+            self.assertEqual(self.admin_client.post("/api/categories", json={"name": bad}).status_code, 400)
+
+        game_id, slug = self.create_game(categories=["Strategi", "Puzzle"])
+        other_id, _other = self.create_game(title="Other", categories=["Puzzle"])
+        puzzle = self.category_ids(["Puzzle"])[0]
+        listed = {category["name"]: category["games"] for category in self.admin_client.get("/api/categories").json}
+        self.assertEqual(listed, {"Puzzle": 2, "Strategi": 1})
+
+        # Games can only pick categories from the list, by id.
+        for categories in (["Puzzle"], [999], [True], "Puzzle"):
+            response = self.admin_client.put(f"/api/games/{game_id}", json={"categories": categories})
+            self.assertEqual(response.status_code, 400, categories)
+
+        # Renaming changes the name everywhere, because games point at the same category.
+        renamed = self.admin_client.put(f"/api/categories/{puzzle}", json={"name": "Gåter"})
+        self.assertEqual((renamed.status_code, renamed.json["name"]), (200, "Gåter"))
+        self.assertEqual(self.category_names(game_id), ["Strategi", "Gåter"])
+        self.assertEqual(self.category_names(other_id), ["Gåter"])
+        public = self.public_client.get(f"/{slug}").get_data(as_text=True)
+        self.assertIn('href="/?category=g%C3%A5ter"', public)
+        self.assertNotIn("Puzzle", public)
+        self.assertEqual(self.admin_client.put(f"/api/categories/{puzzle}", json={"name": "STRATEGI"}).status_code, 409)
+        self.assertEqual(self.admin_client.put(f"/api/categories/{puzzle}", json={"name": "gåter"}).status_code, 200)
+
+        # Deleting removes it from every game.
+        self.assertEqual(self.admin_client.delete(f"/api/categories/{puzzle}").status_code, 200)
+        self.assertEqual(self.category_names(game_id), ["Strategi"])
+        self.assertEqual(self.category_names(other_id), [])
+        self.assertEqual(self.admin_client.delete(f"/api/categories/{puzzle}").status_code, 404)
+        settings_page = self.admin_client.get("/settings").get_data(as_text=True)
+        editor = json.loads(settings_page.split('id="settings-data">')[1].split("</script>")[0])
+        self.assertEqual(editor["categories"], [{"id": first.json["id"], "name": "Strategi", "games": 1}])
+
+    def test_category_order_can_be_changed_for_the_list_and_for_each_game(self):
+        game_id, slug = self.create_game(categories=["Strategi", "Puzzle", "Adventure"])
+        strategi, puzzle, adventure = self.category_ids(["Strategi", "Puzzle", "Adventure"])
+        listed = lambda: [category["name"] for category in self.admin_client.get("/api/categories").json]
+        self.assertEqual(listed(), ["Strategi", "Puzzle", "Adventure"])  # new categories go last
+
+        # The shared list: reorder, and ids left out keep their place after the ones given.
+        self.assertEqual(self.admin_client.put("/api/categories/order", json={"ids": [adventure, 999, strategi]}).status_code, 200)
+        self.assertEqual(listed(), ["Adventure", "Strategi", "Puzzle"])
+        self.assertEqual(self.admin_client.put("/api/categories/order", json={"ids": "nope"}).status_code, 400)
+        page = self.public_client.get("/").get_data(as_text=True)
+        menu = page.split('id="category-menu"')[1].split("</ul>")[0]
+        self.assertLess(menu.index('data-value="adventure"'), menu.index('data-value="strategi"'))
+        self.assertLess(menu.index('data-value="strategi"'), menu.index('data-value="puzzle"'))
+        created = self.admin_client.post("/api/categories", json={"name": "Ny"}).json["id"]
+        self.assertEqual(listed()[-1], "Ny")
+
+        # A game's own order is the order of the ids it is saved with.
+        self.admin_client.put(f"/api/games/{game_id}", json={"categories": [adventure, created, puzzle]})
+        self.assertEqual(self.category_names(game_id), ["Adventure", "Ny", "Puzzle"])
+        card = self.public_client.get("/").get_data(as_text=True).split(f'href="/{slug}"')[1].split("</article>")[0]
+        self.assertLess(card.index(">Adventure<"), card.index(">Ny<"))
+
+    def test_categories_can_be_changed_outside_edit_mode_and_from_the_front_page(self):
+        _game_id, slug = self.create_game(categories=["Puzzle"])
+        admin_game = self.admin_client.get(f"/{slug}").get_data(as_text=True)
+        editor = admin_game.split('<div class="tag-editor">')[1].split("</div>")[0]
+        self.assertIn('id="category-picker"', editor)
+        self.assertNotIn('href="/?category=puzzle"', admin_game)
+        self.assertIn('href="/?category=puzzle"', self.public_client.get(f"/{slug}").get_data(as_text=True))
+        admin_index = self.admin_client.get("/").get_data(as_text=True)
+        for marker in ('id="edit-categories"', 'id="categories-dialog"', 'id="category-manager"'):
+            self.assertIn(marker, admin_index)
+            self.assertNotIn(marker, self.public_client.get("/").get_data(as_text=True))
+        inventory = json.loads(admin_index.split('id="category-data">')[1].split("</script>")[0])
+        self.assertEqual(inventory, [{"id": self.category_ids(["Puzzle"])[0], "name": "Puzzle", "games": 1}])
+
+    def test_per_game_category_names_are_migrated_to_the_shared_list(self):
+        engine = self.admin.extensions["database_engine"]
+        game_id, _slug = self.create_game(categories=[])
+        other_id, _other = self.create_game(title="Other", categories=[])
+        with engine.begin() as connection:
+            connection.exec_driver_sql(
+                "CREATE TABLE game_categories (id INTEGER PRIMARY KEY, game_id INTEGER, name TEXT, position INTEGER)"
+            )
+            connection.exec_driver_sql(
+                "INSERT INTO game_categories (game_id, name, position) VALUES (?, 'Puzzle', 0), (?, 'Co-op', 1), (?, 'puzzle', 0)",
+                (game_id, game_id, other_id),
+            )
+            connection.exec_driver_sql(
+                "DELETE FROM app_migrations WHERE name IN ('category-inventory-v1', 'category-order-v1')"
+            )
+        initialize_db(engine)
+        self.assertEqual(self.category_names(game_id), ["Puzzle", "Co-op"])
+        self.assertEqual(self.category_names(other_id), ["Puzzle"])
+        self.assertEqual([category["name"] for category in self.admin_client.get("/api/categories").json], ["Co-op", "Puzzle"])
+        with Session(engine) as session:
+            self.assertEqual(sorted(session.scalars(select(Category.name))), ["Co-op", "Puzzle"])
+            self.assertIsNotNone(session.get(AppMigration, "category-inventory-v1"))
+        with engine.connect() as connection:
+            self.assertFalse(connection.exec_driver_sql(
+                "SELECT 1 FROM sqlite_master WHERE type = 'table' AND name = 'game_categories'"
+            ).first())
+
     def test_theme_switch_is_on_every_page(self):
         _game_id, slug = self.create_game()
         for client, path in ((self.public_client, "/"), (self.public_client, f"/{slug}"), (self.admin_client, "/settings")):
             page = client.get(path).get_data(as_text=True)
             self.assertIn('<script src="/assets/js/theme.js"></script>', page.split("</head>")[0])
-            self.assertEqual(page.count('name="theme"'), 3)
+            self.assertEqual(page.count('name="theme"'), 2)
         with self.public_client.get("/assets/js/theme.js") as script:
             self.assertEqual(script.status_code, 200)
+
+    def test_menu_links_can_have_their_own_icon(self):
+        nav = [
+            {"key": "link", "label": "Skjema", "url": "https://forms.example/", "icon": "clipboard"},
+            {"key": "link", "label": "Ukjent", "url": "/vilkar", "icon": "<script>"},
+        ]
+        self.assertEqual(self.admin_client.put("/api/settings", json={"nav": nav}).status_code, 200)
+        page = self.public_client.get("/").get_data(as_text=True)
+        self.assertIn('icons.svg#clipboard"/></svg><span>Skjema</span>', page)
+        self.assertIn('icons.svg#link"/></svg><span>Ukjent</span>', page)
+        editor = json.loads(self.admin_client.get("/settings").get_data(as_text=True).split('id="settings-data">')[1].split("</script>")[0])
+        self.assertIn("clipboard", editor["nav_icons"])
+        self.assertEqual(editor["nav"][0]["icon"], "clipboard")
+        # Links saved before icons could be chosen keep their old icon.
+        with Session(self.admin.extensions["database_engine"]) as session:
+            session.merge(Setting(key="nav", value=json.dumps([{"key": "link", "label": "Gammel", "url": "https://x.example/", "new_tab": True}])))
+            session.commit()
+        self.assertIn('icons.svg#external"/></svg><span>Gammel</span>', self.public_client.get("/").get_data(as_text=True))
+
+    def test_files_can_be_added_as_links(self):
+        game_id, slug = self.create_game()
+        add = lambda **body: self.admin_client.post(f"/api/games/{game_id}/file-links", json=body)
+        self.assertEqual(add(platform="windows", url="javascript:alert(1)").status_code, 400)
+        self.assertEqual(add(platform="windows", url="").status_code, 400)
+        self.assertEqual(add(platform="cover", url="https://x.example/a.zip").status_code, 400)
+        self.assertEqual(self.admin_client.post("/api/games/999/file-links", json={"platform": "mac", "url": "https://x.example/"}).status_code, 404)
+        named = add(platform="windows", url="https://cdn.example/builds/Spill%20Setup.zip")
+        drive = add(platform="mac", url="https://www.drive.example/file/d/abc/view")
+        self.assertEqual(named.status_code, 201, named.get_data(as_text=True))
+        self.assertEqual((named.json["name"], named.json["href"]), ("Spill Setup.zip", "https://cdn.example/builds/Spill%20Setup.zip"))
+        self.assertEqual(drive.json["name"], "drive.example")
+        page = self.public_client.get(f"/{slug}").get_data(as_text=True)
+        self.assertIn('<a class="download-btn" href="https://cdn.example/builds/Spill%20Setup.zip" target="_blank" rel="noopener noreferrer">', page)
+        self.assertIn('icons.svg#external"/></svg><span class="file-name" title="Spill Setup.zip">', page)
+        self.assertIn("Last ned og spill", page)
+        self.assertEqual(self.admin_client.delete(f"/api/files/{drive.json['id']}").status_code, 200)
+        self.assertEqual(len(self.admin_client.get(f"/api/games/{game_id}").json["files"]), 1)
+
+    def test_newlines_in_text_become_line_breaks(self):
+        from richtext import page_sections, rich_text
+
+        self.assertEqual(str(rich_text("Linje 1\nLinje 2\n\nLinje 4\n")), "Linje 1<br>Linje 2<br><br>Linje 4")
+        self.assertEqual(str(rich_text("Før<br>\nEtter")), "Før<br>Etter")
+        self.assertEqual(str(rich_text("<ul>\n<li>a</li>\n</ul>\n\n<p>b</p>")), "<ul><li>a</li></ul><p>b</p>")
+        self.assertEqual(str(rich_text("<b>Fet</b>\nlinje")), "<b>Fet</b><br>linje")
+        page = page_sections("<h1>Tittel</h1>\n<p>Intro</p>\n\n<h2>Kort</h2>\nFørste\nAndre")
+        self.assertEqual((str(page["intro"]), str(page["sections"][0]["body"])), ("<h1>Tittel</h1><p>Intro</p>", "Første<br>Andre"))
+        _game_id, slug = self.create_game(note="Tips:\n\nHusk å lagre")
+        self.assertIn("Tips:<br><br>Husk å lagre", self.public_client.get(f"/{slug}").get_data(as_text=True))
 
     def test_settings_reject_unsafe_menu_links(self):
         for url in ("javascript:alert(1)", "//evil.example", "", "#top"):

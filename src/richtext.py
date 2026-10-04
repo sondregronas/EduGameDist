@@ -1,4 +1,8 @@
-"""Minimal allow-list HTML sanitizer for teacher notes, the front page text and the editable pages."""
+"""Minimal allow-list HTML sanitizer for teacher notes, the front page text and the editable pages.
+
+Line breaks in the text become <br>, so plain text needs no HTML. Newlines that only separate block
+tags (</p>, <li>, …) are ignored, as is the newline right after an explicit <br>.
+"""
 import html
 import re
 from html.parser import HTMLParser
@@ -10,7 +14,7 @@ ALLOWED_TAGS = {"a", "b", "strong", "i", "em", "u", "small", "p", "br", "ul", "o
 PAGE_TAGS = ALLOWED_TAGS | {"h1", "h2", "h3", "blockquote", "hr"}
 VOID_TAGS = {"br", "hr"}
 SKIPPED_CONTENT = {"script", "style", "iframe", "object", "embed", "template"}
-BREAKING_TAGS = {"br", "p", "ul", "ol", "li", "h1", "h2", "h3", "blockquote", "hr"}
+BLOCK_TAGS = {"p", "ul", "ol", "li", "h1", "h2", "h3", "blockquote", "hr"}
 # Icons an editable page may put in front of a section heading: <h2 data-icon="windows">.
 PAGE_ICONS = {
     "windows", "mac", "linux", "android", "browser", "shield", "info", "clock", "book", "gamepad",
@@ -53,7 +57,11 @@ class _Sanitizer(HTMLParser):
         self.heading = None
         self.open_tags = []
         self.skip_depth = 0
-        self.after_break = True
+        # Which upcoming newlines are layout rather than line breaks: "all" after a block tag, "one" after <br>.
+        self.swallow = "all"
+
+    def _after(self, tag):
+        self.swallow = "all" if tag in BLOCK_TAGS else "one" if tag == "br" else None
 
     def handle_starttag(self, tag, attrs):
         if tag in SKIPPED_CONTENT:
@@ -67,11 +75,11 @@ class _Sanitizer(HTMLParser):
             self.heading = {"html": [], "text": [], "icon": icon if icon in PAGE_ICONS else None, "body": []}
             self.parts.append(self.heading)
             self.out = self.heading["html"]
-            self.after_break = True
+            self.swallow = "all"
             return
         if self.sections and top_level and tag == "hr":
             self.footer = self.out = []
-            self.after_break = True
+            self.swallow = "all"
             return
         if tag == "a":
             href = safe_href(dict(attrs).get("href"))
@@ -81,11 +89,12 @@ class _Sanitizer(HTMLParser):
             target = ' target="_blank" rel="noopener noreferrer"' if external else ""
             self.out.append(f'<a href="{html.escape(href, quote=True)}"{target}>')
             self.open_tags.append("a")
+            self.swallow = None
             return
         self.out.append(CALLOUT_OPEN if tag == "blockquote" and self.sections else f"<{tag}>")
         if tag not in VOID_TAGS:
             self.open_tags.append(tag)
-        self.after_break = tag in BREAKING_TAGS
+        self._after(tag)
 
     def handle_startendtag(self, tag, attrs):
         if tag in VOID_TAGS:
@@ -100,7 +109,7 @@ class _Sanitizer(HTMLParser):
         if self.heading is not None and tag == "h2" and not self.open_tags:
             self.out = self.heading["body"]
             self.heading = None
-            self.after_break = True
+            self.swallow = "all"
             return
         if tag not in self.open_tags:
             return
@@ -109,7 +118,7 @@ class _Sanitizer(HTMLParser):
             self.out.append("</div></div>" if current == "blockquote" and self.sections else f"</{current}>")
             if current == tag:
                 break
-        self.after_break = tag in BREAKING_TAGS
+        self._after(tag)
 
     def handle_data(self, data):
         if self.skip_depth:
@@ -118,12 +127,14 @@ class _Sanitizer(HTMLParser):
             self.heading["text"].append(data)
         for index, line in enumerate(data.replace("\r\n", "\n").split("\n")):
             if index:
-                if not self.after_break:
+                if self.swallow == "one":
+                    self.swallow = None
+                elif self.swallow is None:
                     self.out.append("<br>")
-                self.after_break = True
             if line:
                 self.out.append(html.escape(line))
-                self.after_break = not line.strip() and self.after_break
+                if line.strip():
+                    self.swallow = None
 
     def close_all(self):
         while self.open_tags:
@@ -135,7 +146,12 @@ class _Sanitizer(HTMLParser):
 
     def result(self):
         self.close_all()
-        return "".join(self.out).strip()
+        return _join(self.out)
+
+
+def _join(chunks):
+    """Join output, dropping line breaks left by trailing newlines."""
+    return re.sub(r"(?:\s*<br>)+\s*$", "", "".join(chunks)).strip()
 
 
 def rich_text(value):
@@ -162,11 +178,11 @@ def page_sections(value):
         sections.append({
             "id": anchor,
             "icon": part["icon"] or (anchor if anchor in PAGE_ICONS else None),
-            "heading": Markup("".join(part["html"]).strip()),
-            "body": Markup("".join(part["body"]).strip()),
+            "heading": Markup(_join(part["html"])),
+            "body": Markup(_join(part["body"])),
         })
     return {
-        "intro": Markup("".join(parser.intro).strip()),
+        "intro": Markup(_join(parser.intro)),
         "sections": sections,
-        "footer": Markup("".join(parser.footer or []).strip()),
+        "footer": Markup(_join(parser.footer or [])),
     }

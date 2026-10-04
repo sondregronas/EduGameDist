@@ -15,6 +15,11 @@ BUILTIN_NAV = {
     "install": {"label": "Installasjon", "href": "/install", "icon": "book"},
     "terms": {"label": "Vilkår", "href": "/vilkar", "icon": "shield"},
 }
+# Icons a custom menu link can have; the settings page cycles through them in this order.
+NAV_ICONS = (
+    "link", "external", "home", "school", "book", "clipboard", "email", "message", "calendar",
+    "star", "heart", "info", "help", "gamepad", "users", "download",
+)
 MAX_NAV_LINKS = 20
 MAX_NAV_LABEL = 40
 TEXT_FIELDS = {
@@ -122,13 +127,14 @@ def nav_items(value):
             if not url or not label:
                 continue
             new_tab = bool(entry.get("new_tab"))
+            icon = entry.get("icon")
             items.append({
                 "key": "link",
                 "label": label,
                 "text": label,
                 "url": url,
                 "href": url,
-                "icon": "external" if new_tab else "link",
+                "icon": icon if icon in NAV_ICONS else "external" if new_tab else "link",
                 "hidden": False,
                 "new_tab": new_tab,
                 "builtin": False,
@@ -160,7 +166,8 @@ def _validated_nav(entries):
             if len(url) > 2000 or url.startswith("#") or not safe_href(url):
                 raise ValueError(f"Lenken «{label}» må starte med https://, http://, mailto: eller /.")
             links += 1
-            result.append({"key": "link", "label": label, "url": url, "new_tab": bool(entry.get("new_tab"))})
+            icon = entry.get("icon") if entry.get("icon") in NAV_ICONS else "link"
+            result.append({"key": "link", "label": label, "url": url, "new_tab": bool(entry.get("new_tab")), "icon": icon})
         else:
             raise ValueError("Menyen er ugyldig.")
     if links > MAX_NAV_LINKS:
@@ -196,10 +203,11 @@ def editor_data():
         "hero_text": stored.get("hero_text", DEFAULT_HERO_TEXT),
         "logo_url": current["logo_url"],
         "nav": [
-            {key: item[key] for key in ("key", "label", "hidden", "url", "new_tab") if key in item}
+            {key: item[key] for key in ("key", "label", "hidden", "url", "new_tab", "icon") if key in item}
             for item in current["nav"]
         ],
         "builtins": BUILTIN_NAV,
+        "nav_icons": NAV_ICONS,
         "pages": {
             name: {"content": stored.get(key, ""), "default": PAGES[name]["default"]}
             for name, key in PAGE_FIELDS.items()

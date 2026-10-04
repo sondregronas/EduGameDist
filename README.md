@@ -23,8 +23,10 @@ The user interface is in Norwegian; the documentation is in English.
 
 - **Two apps:** a public, read-only website and a separate admin app that share the same database and files.
 - **Edit in place:** admin looks like the public site, but with an **Edit** button. Text, categories, links and files are changed where you see them.
-- **Several files per platform** (Windows, Mac, Linux, Android) and links to browser games. Files are uploaded in one request, stored unchanged under their own name in `games/<Platform>/<game>/`, with no size limit in the app.
+- **Several files per platform** (Windows, Mac, Linux, Android), links to files stored elsewhere, and links to browser games. Files are uploaded in one request, stored unchanged under their own name in `games/<Platform>/<game>/`, with no size limit in the app.
 - **Hide games** from visitors with the eye icon on the admin dashboard, without deleting them.
+- **Light and dark mode** with a switch, following the visitor's system setting until they choose.
+- **Shared category list** that games pick from; renaming a category updates every game that has it.
 - **Category and platform filters** on the front page. Filtered views can be linked, e.g. `/?category=puzzle`.
 - **Import from Steam:** title, description, developer and cover image (downloaded and stored locally). GOG, itch.io and Humble links are looked up automatically.
 - **Settings in the browser:** site title, logo/favicon, front page heading and text, menu links (in any order), the installation guide and terms page, and the admin password.

@@ -6,6 +6,8 @@ You can change all metadata fields, add or remove categories and store links, up
 
 Renaming a game changes its address, and its folders in `./games/<Platform>/` are renamed to match.
 
+Categories can be added, removed and reordered straight from the game page, without pressing **Rediger**; those changes are saved immediately. In edit mode they are saved together with everything else when you press **Lagre**.
+
 ## Hiding games
 
 A game can be hidden from visitors without deleting it, for example while you are still adding files:

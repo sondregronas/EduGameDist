@@ -11,6 +11,8 @@ Alternatively you can use something like Watchtower to update your containers au
 
 The application applies its SQLite schema migrations automatically on startup. Legacy game records, categories, store links, platform downloads and covers are migrated on first startup; the old NocoDB metadata database is no longer used.
 
+Category names that earlier versions stored on each game are combined into one shared category list on the first start of a version with category management. Names that only differ in upper and lower case (such as `Puzzle` and `puzzle`) become one category.
+
 ## Upgrading to per-game folders and admin settings
 
 This version stores game files as `./games/<Platform>/<game>/<file name>` and moves the site customization into the admin app. Update `docker-compose.yml` along with the image (compare with the [current file](https://github.com/sondregronas/EduGameDist/blob/main/docker-compose.yml)):

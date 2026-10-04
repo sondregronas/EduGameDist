@@ -7,7 +7,7 @@ from urllib.parse import urlparse
 from sqlalchemy.orm import Session
 
 from app import create_admin_app, create_public_app
-from database import Game, GameCategory, GameFile, GameStoreLink
+from database import Game, GameCategory, GameFile, GameStoreLink, category_named
 
 
 ROOT = Path(__file__).resolve().parent.parent
@@ -127,7 +127,7 @@ def main():
                 session.add(game)
                 session.flush()
                 game.categories = [
-                    GameCategory(game_id=game.id, name=name, position=index)
+                    GameCategory(game_id=game.id, category_id=category_named(session, name, create=True).id, position=index)
                     for index, name in enumerate(sample["categories"])
                 ]
                 game.store_links = [

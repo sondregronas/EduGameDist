@@ -18,25 +18,32 @@
       <input type="search" id="search" placeholder="Søk etter spill" aria-label="Søk etter spill" autocomplete="off">
     </label>
     {% if categories %}
-      <label class="select-box">
-        {{ icon('tag') }}
-        <select id="category-filter" aria-label="Filtrer på kategori">
-          <option value="">Alle kategorier</option>
-          {% for name, count in categories %}<option value="{{ name|lower }}">{{ name }} ({{ count }})</option>{% endfor %}
-        </select>
-        {{ icon('chevron-down', 'select-caret') }}
-      </label>
+      <div class="dropdown" id="category-filter">
+        <button type="button" class="dropdown-button" aria-haspopup="listbox" aria-expanded="false" aria-controls="category-menu">
+          <span class="visually-hidden">Kategori: </span><span class="dropdown-value">{{ icon('tag') }}<span class="menu-text">Alle kategorier</span></span>{{ icon('chevron-down', 'dropdown-caret') }}
+        </button>
+        <ul class="menu" id="category-menu" role="listbox" tabindex="-1" aria-label="Kategori" hidden>
+          <li class="menu-option" role="option" data-value="" aria-selected="true">{{ icon('tag') }}<span class="menu-text">Alle kategorier</span>{{ icon('check', 'menu-check') }}</li>
+          {% for name, count in categories %}
+            <li class="menu-option" role="option" data-value="{{ name|lower }}" aria-selected="false"><span class="menu-dot" style="--h: {{ name|hue }}"></span><span class="menu-text">{{ name }}</span><span class="menu-count">{{ count }}</span>{{ icon('check', 'menu-check') }}</li>
+          {% endfor %}
+        </ul>
+      </div>
     {% endif %}
     {% if platforms %}
-      <label class="select-box">
-        {{ icon('filter') }}
-        <select id="platform-filter" aria-label="Filtrer på plattform">
-          <option value="">Alle plattformer</option>
-          {% for key, label in platforms %}<option value="{{ key }}">{{ label }}</option>{% endfor %}
-        </select>
-        {{ icon('chevron-down', 'select-caret') }}
-      </label>
+      <div class="dropdown" id="platform-filter">
+        <button type="button" class="dropdown-button" aria-haspopup="listbox" aria-expanded="false" aria-controls="platform-menu">
+          <span class="visually-hidden">Plattform: </span><span class="dropdown-value">{{ icon('filter') }}<span class="menu-text">Alle plattformer</span></span>{{ icon('chevron-down', 'dropdown-caret') }}
+        </button>
+        <ul class="menu" id="platform-menu" role="listbox" tabindex="-1" aria-label="Plattform" hidden>
+          <li class="menu-option" role="option" data-value="" aria-selected="true">{{ icon('filter') }}<span class="menu-text">Alle plattformer</span>{{ icon('check', 'menu-check') }}</li>
+          {% for key, label in platforms %}
+            <li class="menu-option" role="option" data-value="{{ key }}" aria-selected="false">{{ icon(key) }}<span class="menu-text">{{ label }}</span>{{ icon('check', 'menu-check') }}</li>
+          {% endfor %}
+        </ul>
+      </div>
     {% endif %}
+    {% if admin %}<button type="button" class="btn btn-small btn-ghost" id="edit-categories">{{ icon('tag') }}Kategorier</button>{% endif %}
     <span class="result-count" id="result-count" aria-live="polite"></span>
   </div>
 
@@ -123,6 +130,7 @@
         <label class="field"><span>Beskrivelse</span><textarea id="add-description" rows="4"></textarea></label>
         <label class="field"><span>Utvikler</span><input id="add-developer"></label>
         <label class="field"><span>Utviklerens nettsted</span><input id="add-developer-link" type="url" placeholder="https://…"></label>
+        <div class="field"><span>Kategorier</span><div id="add-categories"></div></div>
         <div id="add-links" class="link-pills"></div>
         <p class="form-error" id="add-error" role="alert" hidden></p>
         <footer class="dialog-actions">
@@ -131,5 +139,16 @@
         </footer>
       </form>
     </dialog>
+    <dialog id="categories-dialog" class="dialog">
+      <div class="dialog-form">
+        <header class="dialog-head">
+          <h2>{{ icon('tag') }}Kategorier</h2>
+          <button type="button" class="icon-btn" data-close aria-label="Lukk">{{ icon('close') }}</button>
+        </header>
+        <p class="hint">Spillene velger kategorier fra denne listen, og filteret på forsiden viser dem i samme rekkefølge. Endringer lagres med en gang.</p>
+        <div id="category-manager"></div>
+      </div>
+    </dialog>
+    <script type="application/json" id="category-data">{{ category_inventory|tojson }}</script>
   {% endif %}
 {% endblock %}

@@ -25,9 +25,8 @@
         {% if auth_enabled and logged_in %}<form method="post" action="/logout" class="logout-form"><button type="submit" class="nav-button" title="Logg ut">{{ icon('logout') }}<span>Logg ut</span></button></form>{% endif %}
       </nav>
       <div class="theme-switch" role="radiogroup" aria-label="Tema">
-        {% for value, label, symbol in [('dark', 'Mørkt', 'moon'), ('blue', 'Blått', 'water'), ('light', 'Lyst', 'sun')] %}
-          <label title="{{ label }} tema"><input type="radio" name="theme" value="{{ value }}" aria-label="{{ label }}">{{ icon(symbol) }}</label>
-        {% endfor %}
+        <label title="Mørkt tema"><input type="radio" name="theme" value="dark" aria-label="Mørkt">{{ icon('moon') }}</label>
+        <label title="Lyst tema"><input type="radio" name="theme" value="light" aria-label="Lyst">{{ icon('sun') }}</label>
       </div>
     </div>
   </header>

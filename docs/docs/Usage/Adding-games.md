@@ -1,6 +1,6 @@
 # Adding games
 
-Open the admin app at the address configured in Nginx Proxy Manager. Choose **Legg til spill** (Add game) on the front page, enter a Steam link, app ID or game name and press **Hent fra Steam** (Fetch from Steam), then choose **Opprett og legg til filer** (Create and add files). The game opens in edit mode and appears on the public site straight away.
+Open the admin app at the address configured in Nginx Proxy Manager. Choose **Legg til spill** (Add game) on the front page, enter a Steam link, app ID or game name and press **Hent fra Steam** (Fetch from Steam), pick categories if you like, then choose **Opprett og legg til filer** (Create and add files). The game opens in edit mode and appears on the public site straight away.
 
 ## Fetching information from Steam
 
@@ -9,18 +9,20 @@ The title, short description, cover image, developer and Steam link are filled i
 ## Game information
 
 - **Title** and **description** are shown in the overview and on the game page.
-- **Teacher note** is shown on the game page. You can use simple HTML: `<a href="https://…">link</a>`, `<br>`, `<p>`, `<b>`, `<i>`, `<u>`, `<ul>`, `<ol>` and `<li>`. Everything else is removed. Ordinary line breaks are kept.
+- **Teacher note** is shown on the game page. Line breaks are kept as you type them, and you can use simple HTML: `<a href="https://…">link</a>`, `<p>`, `<b>`, `<i>`, `<u>`, `<ul>`, `<ol>` and `<li>`. Everything else is removed.
 - **Cover image** can be fetched from Steam, given as a URL or uploaded.
 - **Number of players**, **play time**, **developer** and **developer website** are optional.
-- **Categories** are added with **+ Ny kategori** (New category) and removed with the minus button on each category. Visitors can filter the front page by category.
+- **Categories** are picked from the shared category list with **+ Legg til kategori** (Add category); type to search the list. If the category you need does not exist yet, **Ny kategori** (New category) adds it to the list and to the game. Remove a category from the game with its minus button, and change the order by dragging the categories (or focusing one and using the left and right arrow keys); the first three are shown on the game's card. The list itself is managed under Settings or from the front page (see [Personalization](Personalization.md#categories)), and visitors can filter the front page by category.
 - **Store links** are added with **+ Ny lenke** (New link); the store is recognized from the address.
 - **Browser game link** is used when the game can be started directly in the browser.
 
-Categories and store links are stored as separate, ordered records linked to the game, not as fixed `Category1`/`Store1` columns.
+Categories are a shared list that games link to, and store links are separate, ordered records per game; neither uses the old fixed `Category1`/`Store1` columns.
 
 ## Uploading files
 
 Press **Rediger** (Edit) on the game page and drop files on the area for the right platform (or click the area to choose files). Repeat to add more files to the same platform or files for another platform. Existing files can be removed in edit mode.
+
+To offer a file that is stored elsewhere (for example on a cloud drive), paste its address in the field under the drop area and press **Legg til** (Add). The link is shown like a file and opens in a new tab; it is named after the file in the address, or after the website if the address has no file name.
 
 Each file is sent in one streamed request and stored unchanged under its own name in `./games/<Platform>/<game>/` on the server, for example `./games/Windows/oslo-2084/Oslo2084-Setup.zip`. Characters that are not allowed in file names are replaced with `_`, and if a file with the same name already exists, the new one gets a number, like `Setup (2).zip`. Visitors always download the file under the name it was uploaded with.
 

@@ -25,6 +25,8 @@
 
   function toast(message, type = '') {
     const box = $('#toasts')
+    // Samme melding flere ganger på rad (f.eks. ved flytting med piltastene) vises bare én gang.
+    $$('.toast', box).filter((item) => item.textContent === message).forEach((item) => item.remove())
     const item = el('div', { class: `toast ${type}` }, message)
     box.appendChild(item)
     setTimeout(() => item.remove(), type === 'error' ? 8000 : 4500)
@@ -86,6 +88,316 @@
     toast(message, type)
   }
 
+  // Flytt elementer i en liste ved å dra dem (mus og berøring), eller med piltastene. Elementet løftes og
+  // følger pekeren, de andre glir unna, og det pulserer når det er plassert.
+  const calm = matchMedia('(prefers-reduced-motion: reduce)')
+  const glide = { duration: 220, easing: 'cubic-bezier(.2, .8, .2, 1)' }
+
+  function sortable(list, { items, axis = 'y', handle = null, onChange }) {
+    const members = () => [...list.children].filter((child) => child.matches(items))
+
+    // Endre rekkefølgen og la elementene gli fra der de var til der de havner (FLIP).
+    function rearrange(change, held = null) {
+      const all = members()
+      const before = new Map(all.map((member) => [member, member.getBoundingClientRect()]))
+      change()
+      // Å flytte et element i DOM-en starter inn-animasjonen (pop) på nytt; den skal ikke vises her.
+      all.forEach((member) => member.getAnimations().forEach((animation) => animation.cancel()))
+      if (calm.matches) return
+      all.forEach((member) => {
+        if (member === held) return
+        const was = before.get(member)
+        const now = member.getBoundingClientRect()
+        if (was.left !== now.left || was.top !== now.top) {
+          member.animate([{ transform: `translate(${was.left - now.left}px, ${was.top - now.top}px)` }, { transform: 'none' }], glide)
+        }
+      })
+    }
+
+    function pulse(item) {
+      if (calm.matches) return
+      const accent = getComputedStyle(item).getPropertyValue('--accent').trim()
+      item.animate([{ boxShadow: `0 0 0 0 ${accent}` }, { boxShadow: '0 0 0 12px transparent' }], { duration: 700, easing: 'ease-out' })
+    }
+
+    list.addEventListener('pointerdown', (event) => {
+      const grip = event.target.closest(handle || items)
+      const item = grip?.closest(items)
+      if (event.button !== 0 || !item || !list.contains(item) || (!handle && event.target.closest('button, input, a'))) return
+      event.preventDefault()
+      const box = item.getBoundingClientRect()
+      const grab = { x: event.clientX - box.left, y: event.clientY - box.top }
+      const origin = { x: event.clientX, y: event.clientY }
+      let lifted = false
+      let moved = false
+
+      // Lyttes på dokumentet: å flytte elementet i DOM-en ville ellers sluppet pekeren.
+      const move = ({ clientX, clientY }) => {
+        if (!lifted) {
+          if (Math.hypot(clientX - origin.x, clientY - origin.y) < 4) return
+          lifted = true
+          item.getAnimations().forEach((animation) => animation.cancel())
+          item.classList.add('dragging')
+          document.documentElement.classList.add('is-sorting')
+        }
+        const target = document.elementFromPoint(clientX, clientY)?.closest(items)
+        if (target && target !== item && target.parentElement === item.parentElement) {
+          const area = target.getBoundingClientRect()
+          const forward = members().indexOf(target) > members().indexOf(item)
+          const point = axis === 'x' ? clientX : clientY
+          const middle = axis === 'x' ? area.left + area.width / 2 : area.top + area.height / 2
+          // Bytt først når pekeren er forbi midten i retningen den flyttes, så elementene ikke hopper frem og tilbake.
+          if (forward ? point > middle : point < middle) {
+            rearrange(() => target[forward ? 'after' : 'before'](item), item)
+            moved = true
+          }
+        }
+        item.style.transform = ''
+        const home = item.getBoundingClientRect()
+        item.style.transform = `translate(${clientX - grab.x - home.left}px, ${clientY - grab.y - home.top}px)`
+      }
+      const end = () => {
+        document.removeEventListener('pointermove', move)
+        document.removeEventListener('pointerup', end)
+        document.removeEventListener('pointercancel', end)
+        if (!lifted) return
+        document.documentElement.classList.remove('is-sorting')
+        const offset = item.style.transform
+        item.style.transform = ''
+        item.classList.remove('dragging')
+        if (offset && !calm.matches) item.animate([{ transform: offset }, { transform: 'none' }], glide)
+        if (moved) {
+          pulse(item)
+          onChange()
+        }
+      }
+      document.addEventListener('pointermove', move)
+      document.addEventListener('pointerup', end)
+      document.addEventListener('pointercancel', end)
+    })
+
+    list.addEventListener('keydown', (event) => {
+      const step = (axis === 'x' ? { ArrowLeft: -1, ArrowRight: 1 } : { ArrowUp: -1, ArrowDown: 1 })[event.key]
+      const item = event.target.closest(items)
+      if (!step || !item || event.target !== (handle ? item.querySelector(handle) : item)) return
+      event.preventDefault()
+      const sibling = step < 0 ? item.previousElementSibling : item.nextElementSibling
+      if (!sibling?.matches(items)) return
+      rearrange(() => sibling[step < 0 ? 'before' : 'after'](item))
+      event.target.focus()
+      pulse(item)
+      onChange()
+    })
+
+    return { rearrange }
+  }
+
+  // ---------- Kategorier: velg fra listen, eller lag en ny med «Ny kategori» ----------
+  function categoryPicker(root, inventory, selectedIds, onChange) {
+    const byId = (id) => inventory.find((category) => category.id === id)
+    let selected = selectedIds.filter(byId)
+    let options = []
+    let active = -1
+    const chips = el('span', { class: 'tag-chips' })
+    const pick = el('button', { type: 'button', class: 'tag-add-btn' }, icon('plus'), el('span', {}, 'Legg til kategori'))
+    const search = el('input', {
+      class: 'tag-input', placeholder: 'Søk i kategoriene …', autocomplete: 'off', role: 'combobox',
+      'aria-expanded': 'false', 'aria-label': 'Søk i kategoriene', hidden: '',
+    })
+    const menu = el('div', { class: 'menu', role: 'listbox', hidden: '' })
+    const create = el('button', { type: 'button', class: 'btn btn-small btn-ghost' }, icon('tag'), 'Ny kategori')
+    const name = el('input', { class: 'tag-input', placeholder: 'Navn på ny kategori', maxlength: '100', 'aria-label': 'Navn på ny kategori', hidden: '' })
+    root.replaceChildren(el('div', { class: 'tag-list' }, chips, el('span', { class: 'tag-add' }, pick, search, menu), el('span', { class: 'tag-add' }, create, name)))
+
+    function renderChips() {
+      chips.replaceChildren(...selected.map((id) => {
+        const category = byId(id)
+        return el('span', { class: 'tag tag-editable', style: `--h: ${hue(category.name)}`, dataset: { id }, tabindex: '0', title: 'Dra for å endre rekkefølgen, eller bruk piltastene' },
+          el('span', {}, category.name),
+          el('button', { type: 'button', class: 'tag-remove', 'aria-label': `Fjern ${category.name}` }, icon('minus')))
+      }))
+    }
+    function choose(id) {
+      if (selected.includes(id)) return
+      selected.push(id)
+      renderChips()
+      onChange()
+    }
+    sortable(chips, {
+      items: '.tag-editable',
+      axis: 'x',
+      onChange: () => {
+        selected = $$('.tag-editable', chips).map((chip) => Number(chip.dataset.id))
+        onChange()
+      },
+    })
+    chips.addEventListener('click', (event) => {
+      const remove = event.target.closest('.tag-remove')
+      if (!remove) return
+      const id = Number(remove.closest('.tag-editable').dataset.id)
+      selected = selected.filter((other) => other !== id)
+      renderChips()
+      onChange()
+    })
+
+    // Søk og velg blant kategoriene som finnes
+    function highlight(index) {
+      active = index
+      $$('.menu-option', menu).forEach((node, i) => node.classList.toggle('active', i === index))
+      $$('.menu-option', menu)[index]?.scrollIntoView({ block: 'nearest' })
+    }
+    function renderMenu() {
+      const query = search.value.trim().toLowerCase()
+      options = inventory.filter((category) => !selected.includes(category.id) && category.name.toLowerCase().includes(query))
+      menu.replaceChildren(...options.map((category, index) => {
+        const node = el('button', { type: 'button', role: 'option', class: 'menu-option', tabindex: '-1' },
+          el('span', { class: 'menu-dot', style: `--h: ${hue(category.name)}` }), el('span', { class: 'menu-text' }, category.name))
+        node.addEventListener('mouseenter', () => highlight(index))
+        node.addEventListener('click', () => { choose(category.id); search.value = ''; renderMenu() })
+        return node
+      }))
+      if (!options.length) {
+        const message = query ? 'Ingen treff. Bruk «Ny kategori» for å lage den.'
+          : inventory.length ? 'Alle kategoriene er valgt.' : 'Ingen kategorier ennå. Bruk «Ny kategori».'
+        menu.append(el('div', { class: 'menu-label' }, message))
+      }
+      menu.hidden = false
+      search.setAttribute('aria-expanded', 'true')
+      highlight(options.length ? 0 : -1)
+    }
+    function closeSearch() {
+      search.value = ''
+      search.hidden = true
+      pick.hidden = false
+      menu.hidden = true
+      search.setAttribute('aria-expanded', 'false')
+    }
+    pick.addEventListener('click', () => { pick.hidden = true; search.hidden = false; search.focus(); renderMenu() })
+    search.addEventListener('input', renderMenu)
+    search.addEventListener('blur', closeSearch)
+    search.addEventListener('keydown', (event) => {
+      if (event.key === 'ArrowDown' && options.length) { event.preventDefault(); highlight((active + 1) % options.length) }
+      else if (event.key === 'ArrowUp' && options.length) { event.preventDefault(); highlight((active - 1 + options.length) % options.length) }
+      else if (event.key === 'Enter') {
+        event.preventDefault()
+        if (options[active]) { choose(options[active].id); search.value = ''; renderMenu() }
+      } else if (event.key === 'Escape') { event.preventDefault(); closeSearch(); pick.focus() }
+    })
+    menu.addEventListener('mousedown', (event) => event.preventDefault())
+
+    // Ny kategori legges i listen og velges med en gang
+    const closeName = () => { name.value = ''; name.hidden = true; create.hidden = false }
+    create.addEventListener('click', () => { create.hidden = true; name.hidden = false; name.focus() })
+    name.addEventListener('blur', () => { if (!name.value.trim()) closeName() })
+    name.addEventListener('keydown', async (event) => {
+      if (event.key === 'Escape') { event.preventDefault(); closeName(); create.focus(); return }
+      if (event.key !== 'Enter') return
+      event.preventDefault()
+      if (!name.value.trim()) return
+      try {
+        const category = await api('POST', '/api/categories', { name: name.value })
+        if (!byId(category.id)) inventory.push({ id: category.id, name: category.name })
+        choose(category.id)
+        toast(category.existing ? `«${category.name}» fantes allerede og er lagt til.` : `Kategorien «${category.name}» er opprettet.`, 'success')
+        closeName()
+        create.focus()
+      } catch (problem) {
+        toast(problem.message, 'error')
+      }
+    })
+
+    renderChips()
+    return { get ids() { return [...selected] } }
+  }
+
+  // ---------- Kategorilisten: legg til, gi nytt navn, slett og endre rekkefølge (lagres med en gang) ----------
+  function categoryManager(root, categories, onChange = () => {}) {
+    const gamesText = (count) => `${count} spill`
+    const list = el('ul', { class: 'category-list' })
+    const nameInput = el('input', { class: 'ghost', maxlength: '100', placeholder: 'Navn på ny kategori', 'aria-label': 'Navn på ny kategori' })
+    const form = el('form', { class: 'inline-form' }, nameInput, el('button', { type: 'submit', class: 'btn btn-small' }, icon('plus'), 'Legg til'))
+    const sort = el('button', { type: 'button', class: 'btn btn-small btn-ghost' }, 'Sorter alfabetisk')
+    root.replaceChildren(list, form, el('div', { class: 'category-tools' }, sort))
+
+    function row(category) {
+      const handle = el('button', { type: 'button', class: 'icon-btn drag-handle', title: 'Dra for å flytte, eller bruk piltastene', 'aria-label': `Flytt ${category.name}` }, icon('grip'))
+      const dot = el('span', { class: 'menu-dot', style: `--h: ${hue(category.name)}` })
+      const input = el('input', { type: 'text', maxlength: '100', 'aria-label': 'Navn på kategorien' })
+      input.value = category.name
+      const remove = el('button', { type: 'button', class: 'icon-btn danger', title: 'Slett kategorien', 'aria-label': `Slett ${category.name}` }, icon('trash'))
+      const item = el('li', { class: 'category-row', dataset: { id: category.id } }, handle, dot, input, el('span', { class: 'category-count' }, gamesText(category.games)), remove)
+      input.addEventListener('keydown', (event) => {
+        if (event.key === 'Enter') { event.preventDefault(); input.blur() }
+        if (event.key === 'Escape') { event.preventDefault(); input.value = category.name; input.blur() }
+      })
+      input.addEventListener('change', async () => {
+        if (!input.value.trim() || input.value.trim() === category.name) { input.value = category.name; return }
+        try {
+          const result = await api('PUT', `/api/categories/${category.id}`, { name: input.value })
+          category.name = result.name
+          input.value = result.name
+          dot.style.setProperty('--h', hue(result.name))
+          handle.setAttribute('aria-label', `Flytt ${result.name}`)
+          toast(`Kategorien heter nå «${result.name}»${category.games ? ` på ${gamesText(category.games)}` : ''}.`, 'success')
+          onChange()
+        } catch (problem) {
+          input.value = category.name
+          toast(problem.message, 'error')
+        }
+      })
+      remove.addEventListener('click', async () => {
+        const used = category.games ? ` Den fjernes fra ${gamesText(category.games)}.` : ''
+        if (!confirm(`Slette kategorien «${category.name}»?${used}`)) return
+        try {
+          await api('DELETE', `/api/categories/${category.id}`)
+          item.remove()
+          toast(`«${category.name}» er slettet.`, 'success')
+          onChange()
+        } catch (problem) {
+          toast(problem.message, 'error')
+        }
+      })
+      return item
+    }
+
+    // Lagringene går etter hverandre, så den siste rekkefølgen alltid vinner.
+    let saving = Promise.resolve()
+    function saveOrder() {
+      const ids = $$('.category-row', list).map((item) => Number(item.dataset.id))
+      saving = saving.then(async () => {
+        try {
+          await api('PUT', '/api/categories/order', { ids })
+          toast('Rekkefølgen er lagret.', 'success')
+          onChange()
+        } catch (problem) {
+          toast(problem.message, 'error')
+        }
+      })
+    }
+
+    list.replaceChildren(...categories.map(row))
+    const order = sortable(list, { items: '.category-row', handle: '.drag-handle', onChange: saveOrder })
+    sort.addEventListener('click', () => {
+      const byName = (a, b) => $('input', a).value.localeCompare($('input', b).value, 'nb', { sensitivity: 'base' })
+      order.rearrange(() => list.append(...$$('.category-row', list).sort(byName)))
+      saveOrder()
+    })
+    form.addEventListener('submit', async (event) => {
+      event.preventDefault()
+      if (!nameInput.value.trim()) { nameInput.focus(); return }
+      try {
+        const result = await api('POST', '/api/categories', { name: nameInput.value })
+        if (result.existing) { toast(`«${result.name}» finnes allerede.`, 'error'); return }
+        list.append(row({ id: result.id, name: result.name, games: 0 }))
+        nameInput.value = ''
+        toast(`Kategorien «${result.name}» er lagt til.`, 'success')
+        onChange()
+      } catch (problem) {
+        toast(problem.message, 'error')
+      }
+    })
+  }
+
   // ---------- Forsiden: legg til spill ----------
   const addDialog = $('#add-dialog')
   if (addDialog) initAddDialog()
@@ -94,6 +406,7 @@
     let steamId = ''
     let coverUrl = ''
     let links = []
+    const categories = categoryPicker($('#add-categories'), JSON.parse($('#category-data').textContent), [], () => {})
     const title = $('#add-title')
     const error = $('#add-error')
     const submit = $('#add-submit')
@@ -149,6 +462,7 @@
           steam_app_id: steamId,
           cover_url: coverUrl,
           store_links: links.map((link) => link.url),
+          categories: categories.ids,
         })
         if (result.warning) flash(result.warning, 'error')
         location.href = `/${result.slug}?edit=1`
@@ -158,6 +472,16 @@
         submit.disabled = false
       }
     })
+  }
+
+  const categoriesDialog = $('#categories-dialog')
+  if (categoriesDialog) {
+    let changed = false
+    categoryManager($('#category-manager', categoriesDialog), JSON.parse($('#category-data').textContent), () => { changed = true })
+    $('#edit-categories').addEventListener('click', () => categoriesDialog.showModal())
+    $$('[data-close]', categoriesDialog).forEach((button) => button.addEventListener('click', () => categoriesDialog.close()))
+    // Filteret og kortene viser kategoriene, så siden lastes på nytt når listen er endret.
+    categoriesDialog.addEventListener('close', () => { if (changed) location.reload() })
   }
 
   const localize = $('#localize-covers')
@@ -275,8 +599,10 @@
       })
       label.value = item.label || ''
       let target
+      let symbol
       const options = el('div', { class: 'nav-options' })
       if (builtin) {
+        symbol = el('span', { class: 'nav-icon' }, icon(info.icon))
         target = el('span', { class: 'nav-target', title: info.href }, info.href)
         const visible = el('input', { type: 'checkbox', class: 'nav-visible' })
         visible.checked = !item.hidden
@@ -284,6 +610,15 @@
         visible.addEventListener('change', () => row.classList.toggle('is-off', !visible.checked))
         options.append(el('label', { class: 'nav-check', title: 'Vis siden i menyen' }, visible, 'Vis'))
       } else {
+        // Egne lenker får et ikon man kan bla gjennom ved å klikke på det.
+        row.dataset.icon = data.nav_icons.includes(item.icon) ? item.icon : data.nav_icons[0]
+        symbol = el('button', { type: 'button', class: 'nav-icon nav-icon-pick', title: 'Klikk for å bytte ikon', 'aria-label': 'Bytt ikon' }, icon(row.dataset.icon))
+        symbol.addEventListener('click', () => {
+          const icons = data.nav_icons
+          row.dataset.icon = icons[(icons.indexOf(row.dataset.icon) + 1) % icons.length]
+          symbol.replaceChildren(icon(row.dataset.icon))
+          markDirty()
+        })
         // Ikke type=url: nettleseren avviser da lokale lenker som /side.
         target = el('input', { type: 'text', inputmode: 'url', class: 'nav-url', maxlength: '2000', placeholder: 'https://… eller /side', 'aria-label': 'Lenke' })
         target.value = item.url || ''
@@ -297,7 +632,7 @@
       const move = el('div', { class: 'nav-move' },
         el('button', { type: 'button', class: 'icon-btn nav-up', 'aria-label': 'Flytt opp', title: 'Flytt opp' }, icon('chevron-up')),
         el('button', { type: 'button', class: 'icon-btn nav-down', 'aria-label': 'Flytt ned', title: 'Flytt ned' }, icon('chevron-down')))
-      row.append(el('span', { class: 'nav-icon' }, icon(builtin ? info.icon : 'link')), label, target, options, move)
+      row.append(symbol, label, target, options, move)
       return row
     }
     function refreshMoves() {
@@ -350,7 +685,7 @@
         hero_title: $('#hero-title').value,
         hero_text: $('#hero-text').value,
         nav: $$('.nav-row', navList).map((row) => (row.dataset.key === 'link'
-          ? { key: 'link', label: $('.nav-label', row).value, url: $('.nav-url', row).value.trim(), new_tab: $('.nav-new-tab', row).checked }
+          ? { key: 'link', label: $('.nav-label', row).value, url: $('.nav-url', row).value.trim(), new_tab: $('.nav-new-tab', row).checked, icon: row.dataset.icon }
           : { key: row.dataset.key, label: $('.nav-label', row).value, hidden: !$('.nav-visible', row).checked })),
       }
       $$('.page-editor').forEach((box) => { body[`${box.dataset.page}_content`] = $('textarea', box).value })
@@ -365,6 +700,9 @@
         button.disabled = false
       }
     })
+
+    // Kategorier: endringer lagres med en gang
+    categoryManager($('#category-manager'), data.categories)
 
     // Passord
     const passwordForm = $('#password-form')
@@ -411,6 +749,20 @@
     let coverChanged = false
     let dirty = false
     let uploading = 0
+    // I redigeringsmodus lagres kategoriene sammen med resten; ellers lagres de med en gang.
+    let categorySaves = Promise.resolve()
+    const categories = categoryPicker($('#category-picker'), data.categories, data.game.categories.map((category) => category.id), () => {
+      if (document.body.classList.contains('editing')) { markDirty(); return }
+      const ids = categories.ids
+      categorySaves = categorySaves.then(async () => {
+        try {
+          await api('PUT', `/api/games/${gameId}`, { categories: ids })
+          toast('Kategoriene er lagret.', 'success')
+        } catch (problem) {
+          toast(problem.message, 'error')
+        }
+      })
+    })
 
     const markDirty = () => { dirty = true }
     const storeInfo = (url) => {
@@ -448,7 +800,7 @@
       const button = event.currentTarget
       const body = {}
       fields.forEach((field) => { body[field.dataset.field] = field.value })
-      body.categories = $$('#tag-list .tag-editable').map((tag) => tag.dataset.value)
+      body.categories = categories.ids
       body.store_links = $$('#link-list .link-pill').map((pill) => pill.dataset.url)
       body.steam_app_id = steamAppId
       if (coverChanged) body.cover_url = coverUrl
@@ -518,26 +870,11 @@
       }
     })
 
-    // Kategorier og butikklenker (plus/minus)
-    $('#tag-list').addEventListener('click', (event) => {
-      const remove = event.target.closest('.tag-remove')
-      if (remove) { remove.closest('.tag-editable').remove(); markDirty() }
-    })
+    // Butikklenker (plus/minus)
     $('#link-list').addEventListener('click', (event) => {
       const remove = event.target.closest('.tag-remove')
       if (remove) { remove.closest('.link-pill').remove(); markDirty() }
     })
-
-    function addCategory(name) {
-      const value = name.trim()
-      if (!value) return false
-      if ($$('#tag-list .tag-editable').some((tag) => tag.dataset.value.toLowerCase() === value.toLowerCase())) return false
-      const remove = el('button', { type: 'button', class: 'tag-remove', 'aria-label': `Fjern ${value}` }, icon('minus'))
-      const chip = el('span', { class: 'tag tag-editable', style: `--h: ${hue(value)}`, dataset: { value } }, el('span', {}, value), remove)
-      $('#tag-list .tag-add').before(chip)
-      markDirty()
-      return true
-    }
 
     function addLink(url) {
       const value = url.trim()
@@ -551,80 +888,22 @@
       return true
     }
 
-    function inlineAdder(buttonId, inputId, onAdd, menu) {
-      const button = $(buttonId)
-      const input = $(inputId)
-      const open = () => { button.hidden = true; input.hidden = false; input.focus(); menu?.render() }
-      const close = () => { input.value = ''; input.hidden = true; button.hidden = false; menu?.hide() }
-      button.addEventListener('click', open)
-      input.addEventListener('keydown', (event) => {
-        if (menu?.key(event)) return
-        if (event.key === 'Enter' || (event.key === ',' && input.type !== 'url')) {
-          event.preventDefault()
-          if (onAdd(input.value)) { input.value = ''; menu?.render() }
-        } else if (event.key === 'Escape') {
-          close()
-        }
-      })
-      input.addEventListener('input', () => menu?.render())
-      input.addEventListener('blur', () => {
-        if (input.value.trim()) onAdd(input.value)
-        close()
-      })
-    }
-
-    // Egendefinert nedtrekksmeny for kategorier
-    function categoryMenu(input, menuEl, known) {
-      let options = []
-      let active = -1
-      const used = () => $$('#tag-list .tag-editable').map((tag) => tag.dataset.value.toLowerCase())
-      const hide = () => { menuEl.hidden = true; input.setAttribute('aria-expanded', 'false'); active = -1 }
-      function highlight(index) {
-        active = index
-        $$('.tag-option', menuEl).forEach((node, i) => node.classList.toggle('active', i === index))
-        $$('.tag-option', menuEl)[index]?.scrollIntoView({ block: 'nearest' })
+    const linkButton = $('#link-add-btn')
+    const linkInput = $('#link-input')
+    const closeLinkInput = () => { linkInput.value = ''; linkInput.hidden = true; linkButton.hidden = false }
+    linkButton.addEventListener('click', () => { linkButton.hidden = true; linkInput.hidden = false; linkInput.focus() })
+    linkInput.addEventListener('keydown', (event) => {
+      if (event.key === 'Enter') {
+        event.preventDefault()
+        if (addLink(linkInput.value)) linkInput.value = ''
+      } else if (event.key === 'Escape') {
+        closeLinkInput()
       }
-      function pick(value) {
-        if (addCategory(value)) input.value = ''
-        render()
-        input.focus()
-      }
-      function render() {
-        const query = input.value.trim().toLowerCase()
-        const taken = used()
-        options = known
-          .filter((name) => !taken.includes(name.toLowerCase()) && name.toLowerCase().includes(query))
-          .map((name) => ({ name, create: false }))
-        if (query && !known.some((name) => name.toLowerCase() === query) && !taken.includes(query)) {
-          options.push({ name: input.value.trim(), create: true })
-        }
-        menuEl.replaceChildren()
-        if (!options.length) { hide(); return }
-        if (options.some((option) => !option.create)) menuEl.append(el('div', { class: 'tag-menu-label' }, 'Eksisterende kategorier'))
-        options.forEach((option, index) => {
-          const node = el('button', {
-            type: 'button', role: 'option', class: `tag-option${option.create ? ' create' : ''}`, style: `--h: ${hue(option.name)}`,
-          }, option.create ? `Opprett «${option.name}»` : option.name)
-          node.addEventListener('mouseenter', () => highlight(index))
-          node.addEventListener('click', () => pick(option.name))
-          menuEl.append(node)
-        })
-        menuEl.hidden = false
-        input.setAttribute('aria-expanded', 'true')
-        active = -1
-      }
-      function key(event) {
-        if (menuEl.hidden || !options.length) return false
-        if (event.key === 'ArrowDown') { event.preventDefault(); highlight((active + 1) % options.length); return true }
-        if (event.key === 'ArrowUp') { event.preventDefault(); highlight((active - 1 + options.length) % options.length); return true }
-        if (event.key === 'Enter' && active >= 0) { event.preventDefault(); pick(options[active].name); return true }
-        return false
-      }
-      menuEl.addEventListener('mousedown', (event) => event.preventDefault())
-      return { render, hide, key }
-    }
-    inlineAdder('#tag-add-btn', '#tag-input', addCategory, categoryMenu($('#tag-input'), $('#tag-menu'), data.categories || []))
-    inlineAdder('#link-add-btn', '#link-input', addLink)
+    })
+    linkInput.addEventListener('blur', () => {
+      if (linkInput.value.trim()) addLink(linkInput.value)
+      closeLinkInput()
+    })
 
     async function findStores(title, developer) {
       const found = await api('POST', '/api/stores', { title, developer })
@@ -716,7 +995,8 @@
     }
 
     function fileItem(file) {
-      const link = el('a', { class: 'download-btn', href: file.href }, icon('download'), el('span', { class: 'file-name', title: file.name }, file.name))
+      const external = file.url ? { target: '_blank', rel: 'noopener noreferrer' } : {}
+      const link = el('a', { class: 'download-btn', href: file.href, ...external }, icon(file.url ? 'external' : 'download'), el('span', { class: 'file-name', title: file.name }, file.name))
       if (file.size_text) link.append(el('span', { class: 'file-size' }, file.size_text))
       const remove = el('button', { type: 'button', class: 'icon-btn danger edit-only file-delete', 'aria-label': `Slett ${file.name}` }, icon('trash'))
       return el('li', { dataset: { fileId: file.id } }, link, remove)
@@ -766,6 +1046,29 @@
         event.preventDefault()
         zone.classList.remove('drag')
         enqueue([...event.dataTransfer.files])
+      })
+    })
+
+    // Lenke til en fil som ligger et annet sted, i stedet for å laste den opp
+    $$('.file-link', page).forEach((form) => {
+      const block = form.closest('.platform-block')
+      const input = $('input', form)
+      const button = $('button', form)
+      form.addEventListener('submit', async (event) => {
+        event.preventDefault()
+        if (!input.value.trim()) { input.focus(); return }
+        button.disabled = true
+        try {
+          const result = await api('POST', `/api/games/${gameId}/file-links`, { platform: form.dataset.platform, url: input.value })
+          input.value = ''
+          block.classList.remove('is-empty')
+          $('.file-list', block).appendChild(fileItem(result))
+          toast('Lenken er lagt til.', 'success')
+        } catch (problem) {
+          toast(problem.message, 'error')
+        } finally {
+          button.disabled = false
+        }
       })
     })
 
