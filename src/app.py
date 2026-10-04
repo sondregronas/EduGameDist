@@ -29,18 +29,20 @@ from flask import (
     send_file,
     send_from_directory,
 )
-from sqlalchemy import select
+from sqlalchemy import delete, select
 from sqlalchemy.exc import SQLAlchemyError
 from sqlalchemy.orm import Session
 from werkzeug.exceptions import RequestEntityTooLarge
 
 from database import (
+    Category,
     Game,
     GameCategory,
     GameFile,
     GameStoreLink,
     PLATFORMS,
-    all_category_names,
+    all_categories,
+    category_named,
     file_href,
     get_game,
     initialize_db,
@@ -512,15 +514,18 @@ def _open_app(mode, data_dir=None, games_dir=None):
     @app.get("/")
     def index():
         games = list_games(g.db, include_hidden=mode == "admin")
-        categories = {}
+        counts = {}
         for game in games:
-            for name in game["category"]:
-                categories.setdefault(name.lower(), [name, 0])[1] += 1
+            for category in game["categories"]:
+                counts[category["id"]] = counts.get(category["id"], 0) + 1
+        inventory = all_categories(g.db, counts=True)
         present = {platform for game in games for platform in game["platforms"]}
         return render_template(
             "index.html",
             games=games,
-            categories=sorted(categories.values(), key=lambda entry: entry[0].lower()),
+            category_inventory=inventory if mode == "admin" else [],
+            # The filter lists the categories in use, in the order chosen in admin.
+            categories=[(category["name"], counts[category["id"]]) for category in inventory if category["id"] in counts],
             platforms=[(key, label) for key, label in PLATFORMS.items() if key in present],
             remote_covers=sum(1 for game in games if _is_remote(game["cover"])) if mode == "admin" else 0,
             storage_warning=mode == "admin" and any(_games_folder(platform) is None for platform in FILE_PLATFORMS),
@@ -558,7 +563,7 @@ def _open_app(mode, data_dir=None, games_dir=None):
             context["editor"] = {
                 "game": _client_game(game),
                 "stores": store_catalog(),
-                "categories": all_category_names(g.db),
+                "categories": all_categories(g.db),
             }
             context["upload_platforms"] = {key: PLATFORMS[key] for key in FILE_PLATFORMS}
         return render_template("game.html", **context)
@@ -612,7 +617,7 @@ def _client_game(game):
         "browser_url": game["browser_url"],
         "steam_app_id": game["steam_app_id"],
         "cover_url": "" if cover.startswith("data:") else cover,
-        "categories": game["category"],
+        "categories": game["categories"],
         "links": game["links"],
         "hidden": game["hidden"],
         "files": [_file_view(item) for item in game["files"]],
@@ -654,7 +659,7 @@ def _configure_admin(app):
         return render_template(
             "settings.html",
             title="Innstillinger",
-            data=settings.editor_data(),
+            data={**settings.editor_data(), "categories": all_categories(g.db, counts=True)},
             pages=PAGES,
             default_title=current_app.config["TITLE"],
             password=password_status(),
@@ -700,6 +705,59 @@ def _configure_admin(app):
         g.db.commit()
         _remove_logo(old)
         return jsonify(logo_url="")
+
+    @app.get("/api/categories")
+    def list_categories():
+        return jsonify(all_categories(g.db, counts=True))
+
+    @app.post("/api/categories")
+    def create_category():
+        try:
+            name = _category_name((request.get_json(silent=True) or {}).get("name"))
+        except ValueError as error:
+            return jsonify(error=str(error)), 400
+        existing = category_named(g.db, name)
+        if existing:
+            return jsonify(id=existing.id, name=existing.name, existing=True)
+        category = category_named(g.db, name, create=True)
+        return jsonify(id=category.id, name=category.name, existing=False), 201
+
+    @app.put("/api/categories/order")
+    def order_categories():
+        ids = (request.get_json(silent=True) or {}).get("ids")
+        if not isinstance(ids, list) or any(not isinstance(item, int) or isinstance(item, bool) for item in ids):
+            return jsonify(error="Rekkefølgen må sendes som en liste med id-er."), 400
+        categories = {category.id: category for category in g.db.scalars(select(Category).order_by(Category.position, Category.name))}
+        ordered = [categories[item] for item in dict.fromkeys(ids) if item in categories]
+        ordered += [category for category in categories.values() if category not in ordered]
+        for position, category in enumerate(ordered):
+            category.position = position
+        return jsonify(status="saved")
+
+    @app.put("/api/categories/<int:category_id>")
+    def rename_category(category_id):
+        category = g.db.get(Category, category_id)
+        if not category:
+            return jsonify(error="Kategorien finnes ikke."), 404
+        try:
+            name = _category_name((request.get_json(silent=True) or {}).get("name"))
+        except ValueError as error:
+            return jsonify(error=str(error)), 400
+        other = category_named(g.db, name)
+        if other and other.id != category.id:
+            return jsonify(error=f"Kategorien «{other.name}» finnes allerede."), 409
+        # Games link to the category itself, so they all show the new name.
+        category.name = name
+        return jsonify(id=category.id, name=category.name)
+
+    @app.delete("/api/categories/<int:category_id>")
+    def delete_category(category_id):
+        category = g.db.get(Category, category_id)
+        if not category:
+            return jsonify(error="Kategorien finnes ikke."), 404
+        g.db.execute(delete(GameCategory).where(GameCategory.category_id == category_id))
+        g.db.delete(category)
+        return jsonify(status="deleted")
 
     @app.get("/api/games")
     def admin_games():
@@ -899,6 +957,27 @@ def _configure_admin(app):
             size_text=_human_size(received),
         ), 201
 
+    @app.post("/api/games/<int:game_id>/file-links")
+    def add_file_link(game_id):
+        """Add a download that lives elsewhere (e.g. a cloud drive) instead of uploading the file."""
+        game = g.db.get(Game, game_id)
+        if not game:
+            return jsonify(error="Spillet finnes ikke."), 404
+        body = request.get_json(silent=True) or {}
+        platform = str(body.get("platform", ""))
+        if platform not in FILE_PLATFORMS:
+            return jsonify(error="Ugyldig plattform."), 400
+        try:
+            url = _http_url(str(body.get("url") or "").strip(), "Lenken")
+        except ValueError as error:
+            return jsonify(error=str(error)), 400
+        if not url:
+            return jsonify(error="Lim inn en lenke først."), 400
+        item = GameFile(game_id=game_id, platform=platform, original_name=_link_name(url), url=url)
+        g.db.add(item)
+        g.db.flush()
+        return jsonify(id=item.id, href=url, url=url, name=item.original_name, platform=platform, size=None, size_text=""), 201
+
     @app.delete("/api/files/<int:file_id>")
     def delete_file(file_id):
         item = g.db.get(GameFile, file_id)
@@ -928,6 +1007,15 @@ def _delete_uploaded_file(stored_name):
     path.unlink(missing_ok=True)
     if stored_name.startswith("games/"):
         _remove_if_empty(path.parent)
+
+
+def _link_name(url):
+    """Show a linked file by its file name when the address has one, otherwise by the site's name."""
+    parsed = urlparse(url)
+    name = unquote(PurePosixPath(parsed.path).name)
+    if Path(name).suffix and len(name) <= 200:
+        return name
+    return (parsed.hostname or url).removeprefix("www.")
 
 
 def _remove_logo(name):
@@ -1016,8 +1104,8 @@ def _apply_values(game, values):
         game.categories.clear()
         g.db.flush()
         game.categories = [
-            GameCategory(game_id=game.id, name=name, position=position)
-            for position, name in enumerate(values["categories"])
+            GameCategory(game_id=game.id, category_id=category_id, position=position)
+            for position, category_id in enumerate(values["categories"])
         ]
     if "store_links" in values:
         game.store_links.clear()
@@ -1068,10 +1156,17 @@ def _validated_game_values(body, creating=False):
                 raise ValueError("Synlighet må være true eller false.")
             values["hidden"] = body["hidden"]
         if "categories" in body:
-            categories = _split_values(body.get("categories"))
-            if len(categories) > 30 or any(len(name) > 100 for name in categories):
-                raise ValueError("Maks 30 kategorier på maks 100 tegn hver.")
-            values["categories"] = categories
+            # Games pick from the shared category list, by id.
+            ids = body.get("categories")
+            if not isinstance(ids, list) or any(not isinstance(item, int) or isinstance(item, bool) for item in ids):
+                raise ValueError("Kategoriene må sendes som en liste med id-er.")
+            ids = list(dict.fromkeys(ids))
+            if len(ids) > 30:
+                raise ValueError("Et spill kan ha maks 30 kategorier.")
+            known = set(g.db.scalars(select(Category.id).where(Category.id.in_(ids))))
+            if len(known) != len(ids):
+                raise ValueError("En av kategoriene finnes ikke lenger. Last siden på nytt.")
+            values["categories"] = ids
         if "store_links" in body:
             links = _split_values(body.get("store_links"))
             if len(links) > 20:
@@ -1080,6 +1175,15 @@ def _validated_game_values(body, creating=False):
     except ValueError as error:
         return jsonify(error=str(error)), 400
     return values
+
+
+def _category_name(value):
+    name = " ".join(str(value or "").split())
+    if not name or len(name) > 100:
+        raise ValueError("Kategorien må ha et navn på maks 100 tegn.")
+    if "|" in name:
+        raise ValueError("Kategorinavn kan ikke inneholde «|».")
+    return name
 
 
 def _split_values(value):

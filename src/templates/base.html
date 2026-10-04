@@ -7,6 +7,7 @@
   <title>{% if title and title != site.title %}{{ title }} · {% endif %}{{ site.title }}{% if admin %} (admin){% endif %}</title>
   <link rel="stylesheet" href="/assets/css/app.css">
   <link rel="icon" href="{{ site.favicon_url }}">
+  <script src="/assets/js/theme.js"></script>
   {% block head %}{% endblock %}
 </head>
 <body class="{% if admin %}is-admin{% endif %}">
@@ -23,6 +24,10 @@
         {% endif %}
         {% if auth_enabled and logged_in %}<form method="post" action="/logout" class="logout-form"><button type="submit" class="nav-button" title="Logg ut">{{ icon('logout') }}<span>Logg ut</span></button></form>{% endif %}
       </nav>
+      <div class="theme-switch" role="radiogroup" aria-label="Tema">
+        <label title="Mørkt tema"><input type="radio" name="theme" value="dark" aria-label="Mørkt">{{ icon('moon') }}</label>
+        <label title="Lyst tema"><input type="radio" name="theme" value="light" aria-label="Lyst">{{ icon('sun') }}</label>
+      </div>
     </div>
   </header>
   <main class="wrap page">{% block content %}{% endblock %}</main>

@@ -104,18 +104,35 @@ class Game(Base):
     )
 
 
+class Category(Base):
+    """A category in the shared list that games pick from. Renaming it renames it on every game."""
+
+    __tablename__ = "categories"
+
+    id: Mapped[int] = mapped_column(primary_key=True, init=False)
+    name: Mapped[str] = mapped_column(String(collation="NOCASE"), unique=True, nullable=False)
+    position: Mapped[int] = mapped_column(Integer, default=0, server_default="0")
+
+
 class GameCategory(Base):
-    __tablename__ = "game_categories"
+    """Links a game to a category, in the order the game shows its categories."""
+
+    __tablename__ = "game_category_links"
     __table_args__ = (
-        UniqueConstraint("game_id", "name", name="uq_game_category_name"),
-        Index("idx_game_categories_order", "game_id", "position"),
+        UniqueConstraint("game_id", "category_id", name="uq_game_category"),
+        Index("idx_game_category_links_order", "game_id", "position"),
     )
 
     id: Mapped[int] = mapped_column(primary_key=True, init=False)
     game_id: Mapped[int] = mapped_column(ForeignKey("games.id", ondelete="CASCADE"))
-    name: Mapped[str] = mapped_column(String, nullable=False)
+    category_id: Mapped[int] = mapped_column(ForeignKey("categories.id", ondelete="CASCADE"), index=True)
     position: Mapped[int] = mapped_column(Integer, default=0)
     game: Mapped[Game] = relationship(back_populates="categories", init=False, repr=False)
+    category: Mapped[Category] = relationship(init=False, repr=False, lazy="joined")
+
+    @property
+    def name(self):
+        return self.category.name
 
 
 class GameStoreLink(Base):
@@ -260,6 +277,8 @@ def initialize_db(engine):
         ):
             if column.lower() not in columns:
                 connection.execute(text(f'ALTER TABLE games ADD COLUMN "{column}" {definition}'))
+        if "position" not in {column["name"] for column in inspect(connection).get_columns("categories")}:
+            connection.execute(text("ALTER TABLE categories ADD COLUMN position INTEGER NOT NULL DEFAULT 0"))
 
     with Session(engine) as session:
         used_slugs = set(RESERVED_SLUGS)
@@ -277,16 +296,32 @@ def initialize_db(engine):
             game.slug = slug
 
         session.flush()
+        if not session.get(AppMigration, "category-inventory-v1"):
+            # Earlier versions stored category names per game; turn them into one shared list.
+            if inspect(session.connection()).has_table("game_categories"):
+                rows = session.execute(text(
+                    "SELECT game_id, name FROM game_categories WHERE game_id IN (SELECT id FROM games) "
+                    "ORDER BY game_id, position, id"
+                )).all()
+                for game_id, name in rows:
+                    name = " ".join(str(name or "").split())
+                    if name:
+                        _link_category(session, game_id, category_named(session, name, create=True))
+                session.execute(text("DROP TABLE game_categories"))
+            session.add(AppMigration(name="category-inventory-v1"))
+
+        if not session.get(AppMigration, "category-order-v1"):
+            # Start the shared list in alphabetical order; admins can reorder it afterwards.
+            for position, category in enumerate(sorted(session.scalars(select(Category)), key=lambda item: item.name.casefold())):
+                category.position = position
+            session.add(AppMigration(name="category-order-v1"))
+
         if not session.get(AppMigration, "legacy-metadata-v2"):
             for game in session.scalars(select(Game)):
                 if not game.categories:
-                    values = list(dict.fromkeys(
-                        value for value in (game.category1, game.category2, game.category3) if value
-                    ))
-                    game.categories = [
-                        GameCategory(game_id=game.id, name=value, position=position)
-                        for position, value in enumerate(values)
-                    ]
+                    for value in (game.category1, game.category2, game.category3):
+                        if value and value.strip():
+                            _link_category(session, game.id, category_named(session, value.strip(), create=True))
                 if not game.store_links:
                     values = [
                         getattr(game, field)
@@ -343,6 +378,42 @@ def initialize_db(engine):
                 index.create(connection, checkfirst=True)
 
 
+def category_named(session, name, create=False):
+    """Find a category by name regardless of case, optionally creating it."""
+    wanted = name.casefold()
+    for category in session.scalars(select(Category)):
+        if category.name.casefold() == wanted:
+            return category
+    if not create:
+        return None
+    last = session.scalar(select(func.max(Category.position)))
+    category = Category(name=name, position=0 if last is None else last + 1)
+    session.add(category)
+    session.flush()
+    return category
+
+
+def _link_category(session, game_id, category):
+    links = session.scalars(select(GameCategory).where(GameCategory.game_id == game_id)).all()
+    if all(link.category_id != category.id for link in links):
+        session.add(GameCategory(game_id=game_id, category_id=category.id, position=len(links)))
+        session.flush()
+
+
+def all_categories(session, counts=False):
+    """The shared category list in its chosen order, optionally with how many games use each one."""
+    categories = session.scalars(select(Category).order_by(Category.position, Category.name)).all()
+    totals = {}
+    if counts:
+        totals = dict(session.execute(
+            select(GameCategory.category_id, func.count()).group_by(GameCategory.category_id)
+        ).all())
+    return [
+        {"id": category.id, "name": category.name, **({"games": totals.get(category.id, 0)} if counts else {})}
+        for category in categories
+    ]
+
+
 def _store_label(value):
     from urllib.parse import urlparse
 
@@ -380,10 +451,6 @@ def _platforms(browser_url, files):
     return [key for key in PLATFORMS if key != "cover" and key in present]
 
 
-def all_category_names(session):
-    return list(session.scalars(select(GameCategory.name).distinct().order_by(GameCategory.name)))
-
-
 def get_game(session, game_id):
     game = session.get(Game, game_id)
     if not game:
@@ -404,6 +471,7 @@ def get_game(session, game_id):
         "ttb": game.time or "",
         "players": game.players or "",
         "category": [item.name for item in game.categories],
+        "categories": [{"id": item.category_id, "name": item.name} for item in game.categories],
         "developer": game.developer or "",
         "developer_link": _public_url(game.developer_link, allow_local=True),
         "links": [

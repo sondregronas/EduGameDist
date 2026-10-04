@@ -11,7 +11,7 @@
   </section>
 
   <nav class="settings-jump" aria-label="Innstillinger">
-    <a href="#site">Nettstedet</a><a href="#frontpage">Forsiden</a><a href="#menu">Meny</a><a href="#pages">Sider</a><a href="#password">Passord</a>
+    <a href="#site">Nettstedet</a><a href="#frontpage">Forsiden</a><a href="#menu">Meny</a><a href="#pages">Sider</a><a href="#categories">Kategorier</a><a href="#password">Passord</a>
   </nav>
 
   <form id="settings-form" class="settings-form" autocomplete="off">
@@ -34,7 +34,7 @@
       <header>{{ icon('browser') }}<h2>Forsiden</h2></header>
       <label class="field"><span>Overskrift</span>
         <input id="hero-title" maxlength="200" placeholder="Samme som tittelen"></label>
-      <label class="field"><span>Tekst under overskriften. Lenker (&lt;a href="…"&gt;), &lt;b&gt;, &lt;i&gt; og &lt;br&gt; støttes, for eksempel en lenke til et skjema for å ønske seg spill.</span>
+      <label class="field"><span>Tekst under overskriften. Linjeskift vises som de er, og lenker (&lt;a href="…"&gt;), &lt;b&gt; og &lt;i&gt; støttes, for eksempel en lenke til et skjema for å ønske seg spill.</span>
         <textarea id="hero-text" rows="2" maxlength="2000"></textarea></label>
     </section>
 
@@ -47,7 +47,7 @@
 
     <section class="settings-card" id="pages">
       <header>{{ icon('edit') }}<h2>Sider</h2></header>
-      <p class="hint">Teksten skrives med enkel HTML. <code>&lt;h1&gt;</code> og avsnittet under blir sideoverskriften, hver <code>&lt;h2&gt;</code> starter et nytt kort (velg ikon med for eksempel <code>&lt;h2 data-icon="windows"&gt;</code>), <code>&lt;blockquote&gt;</code> blir en uthevet merknad, og alt etter <code>&lt;hr&gt;</code> vises som en fotnote. Lenker, <code>&lt;p&gt;</code>, <code>&lt;b&gt;</code>, <code>&lt;i&gt;</code>, <code>&lt;small&gt;</code>, <code>&lt;ul&gt;</code>, <code>&lt;ol&gt;</code> og <code>&lt;li&gt;</code> støttes. La feltet stå tomt for å bruke standardteksten.</p>
+      <p class="hint">Teksten skrives med enkel HTML, og linjeskift vises som de er. <code>&lt;h1&gt;</code> og avsnittet under blir sideoverskriften, hver <code>&lt;h2&gt;</code> starter et nytt kort (velg ikon med for eksempel <code>&lt;h2 data-icon="windows"&gt;</code>), <code>&lt;blockquote&gt;</code> blir en uthevet merknad, og alt etter <code>&lt;hr&gt;</code> vises som en fotnote. Lenker, <code>&lt;p&gt;</code>, <code>&lt;b&gt;</code>, <code>&lt;i&gt;</code>, <code>&lt;small&gt;</code>, <code>&lt;ul&gt;</code>, <code>&lt;ol&gt;</code> og <code>&lt;li&gt;</code> støttes. La feltet stå tomt for å bruke standardteksten.</p>
       {% for name, page in pages.items() %}
         <div class="page-editor" data-page="{{ name }}">
           <div class="page-editor-head">
@@ -64,6 +64,12 @@
       <button type="submit" class="btn btn-primary" id="settings-save">{{ icon('save') }}Lagre innstillingene</button>
     </div>
   </form>
+
+  <section class="settings-card" id="categories">
+    <header>{{ icon('tag') }}<h2>Kategorier</h2></header>
+    <p class="hint">Spillene velger kategorier fra denne listen. Gir du en kategori nytt navn, får alle spillene som har den det nye navnet, og sletter du den, fjernes den fra spillene. Dra i håndtaket (eller bruk piltastene på det) for å endre rekkefølgen i filteret på forsiden. Endringer her lagres med en gang. Kategoriene kan også endres fra forsiden i admin.</p>
+    <div id="category-manager"></div>
+  </section>
 
   <section class="settings-card" id="password">
     <header>{{ icon('lock') }}<h2>Passord for admin</h2></header>

@@ -64,7 +64,7 @@
       <div class="chips">
         {% if game.players %}<span class="chip view-only">{{ icon('user' if game.players == '1' else 'users') }}{{ game.players }} {{ 'spiller' if game.players == '1' else 'spillere' }}</span>{% endif %}
         {% if game.ttb %}<span class="chip view-only">{{ icon('clock') }}{{ game.ttb }}</span>{% endif %}
-        {% for category in game.category %}<a class="tag view-only" style="--h: {{ category|hue }}" href="/?category={{ category|lower|urlencode }}" title="Vis alle spill i «{{ category }}»">{{ category }}</a>{% endfor %}
+        {% if not admin %}{% for category in game.category %}<a class="tag" style="--h: {{ category|hue }}" href="/?category={{ category|lower|urlencode }}" title="Vis alle spill i «{{ category }}»">{{ category }}</a>{% endfor %}{% endif %}
         {% if admin %}
           <label class="chip chip-edit edit-only">{{ icon('users') }}<input data-field="players" value="{{ game.players }}" placeholder="Spillere (1 eller 2–4)" size="20"></label>
           <label class="chip chip-edit edit-only">{{ icon('clock') }}<input data-field="time" value="{{ game.ttb }}" placeholder="Spilletid (30 min)" size="20"></label>
@@ -73,23 +73,15 @@
 
       {% if game.note %}<div class="callout view-only">{{ icon('info') }}<div class="callout-text">{{ game.note|rich_text }}</div></div>{% endif %}
       {% if admin %}
-        <label class="field edit-only"><span>Merknad som vises på spillsiden (f.eks. tips til lærere). Lenker (&lt;a href&gt;), &lt;br&gt;, &lt;b&gt;, &lt;i&gt;, &lt;ul&gt; og &lt;li&gt; støttes.</span>
+        <label class="field edit-only"><span>Merknad som vises på spillsiden (f.eks. tips til lærere). Linjeskift vises som de er. Lenker (&lt;a href&gt;), &lt;b&gt;, &lt;i&gt;, &lt;ul&gt; og &lt;li&gt; støttes.</span>
           <textarea class="ghost ghost-text" data-field="note" rows="2" placeholder="Valgfritt">{{ game.note }}</textarea></label>
       {% endif %}
 
       {% if admin %}
-        <div class="tag-editor edit-only" id="tag-editor">
-          <span class="field-label">Kategorier</span>
-          <div class="tag-list" id="tag-list">
-            {% for category in game.category %}
-              <span class="tag tag-editable" style="--h: {{ category|hue }}" data-value="{{ category }}"><span>{{ category }}</span><button type="button" class="tag-remove" aria-label="Fjern {{ category }}">{{ icon('minus') }}</button></span>
-            {% endfor %}
-            <span class="tag-add">
-              <button type="button" class="tag-add-btn" id="tag-add-btn">{{ icon('plus') }}<span>Ny kategori</span></button>
-              <input class="tag-input" id="tag-input" placeholder="Skriv eller velg …" maxlength="100" autocomplete="off" role="combobox" aria-expanded="false" aria-controls="tag-menu" hidden>
-              <div class="tag-menu" id="tag-menu" role="listbox" hidden></div>
-            </span>
-          </div>
+        {# Kategoriene kan endres uten å gå inn i redigeringsmodus; der lagres de med en gang. #}
+        <div class="tag-editor">
+          <span class="field-label edit-only">Kategorier</span>
+          <div id="category-picker"></div>
         </div>
       {% endif %}
 
@@ -120,7 +112,7 @@
               <ul class="file-list">
                 {% for file in files %}
                   <li data-file-id="{{ file.id }}">
-                    <a class="download-btn" href="{{ file.href }}"{% if file.url %} target="_blank" rel="noopener noreferrer"{% endif %}>{{ icon('download') }}<span class="file-name" title="{{ file.name }}">{{ file.name }}</span>{% if file.size_text %}<span class="file-size">{{ file.size_text }}</span>{% endif %}</a>
+                    <a class="download-btn" href="{{ file.href }}"{% if file.url %} target="_blank" rel="noopener noreferrer"{% endif %}>{{ icon('external' if file.url else 'download') }}<span class="file-name" title="{{ file.name }}">{{ file.name }}</span>{% if file.size_text %}<span class="file-size">{{ file.size_text }}</span>{% endif %}</a>
                     {% if admin %}<button type="button" class="icon-btn danger edit-only file-delete" aria-label="Slett {{ file.name }}">{{ icon('trash') }}</button>{% endif %}
                   </li>
                 {% endfor %}
@@ -131,6 +123,10 @@
                   <input type="file" multiple hidden>
                 </label>
                 <div class="uploads edit-only"></div>
+                <form class="file-link inline-form edit-only" data-platform="{{ key }}">
+                  <input class="ghost" type="text" inputmode="url" placeholder="…eller lim inn en lenke (https://…)" aria-label="Lenke til en {{ label }}-fil">
+                  <button type="submit" class="btn btn-small">{{ icon('link') }}Legg til</button>
+                </form>
               {% endif %}
             {% endif %}
           </div>
