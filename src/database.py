@@ -180,6 +180,16 @@ def _slugify(value):
     return re.sub(r"-+", "-", value).strip("-") or "game"
 
 
+def _legacy_cover_path(value):
+    """Map an old NocoDB attachment path (e.g. /download/noco/Games/Games/Cover/x.jpg) to a legacy cover URL."""
+    path = "/" + unquote(urlparse(value).path).lstrip("/")
+    if path.startswith("/download/") or "/Cover/" in path:
+        name = Path(path).name
+        if Path(name).suffix:
+            return "/legacy-covers/" + name
+    return ""
+
+
 def _legacy_cover_url(value):
     if isinstance(value, bytes):
         return "data:image/jpeg;base64," + base64.b64encode(value).decode("ascii")
@@ -189,18 +199,18 @@ def _legacy_cover_url(value):
         return value
     try:
         parsed = json.loads(value)
+    except json.JSONDecodeError:
+        return _legacy_cover_path(value)
+    try:
         item = parsed[0] if isinstance(parsed, list) and parsed else parsed
         path = item.get("path") or item.get("url", "")
-        match = re.search(r"/download/.+/.+/.+?/Cover/([^/?]+)", path)
-        if match:
-            return "/legacy-covers/" + unquote(Path(match.group(1)).name)
-        if _is_http_url(item.get("url", "")):
-            return item["url"]
-        if item.get("path"):
-            return "/legacy-covers/" + unquote(Path(item["path"]).name)
-    except (json.JSONDecodeError, AttributeError, IndexError, TypeError):
+        if _is_http_url(path):
+            return _legacy_cover_path(path) if "/Cover/" in path else path
+        return _legacy_cover_path(path) or (
+            "/legacy-covers/" + unquote(Path(path).name) if path else ""
+        )
+    except (AttributeError, IndexError, TypeError):
         return ""
-    return ""
 
 
 def _is_http_url(value):
@@ -242,6 +252,8 @@ def initialize_db(engine):
                 suffix += 1
             used_slugs.add(slug)
             game.cover_url = game.cover_url or _legacy_cover_url(game.cover)
+            if game.cover_url and not _is_http_url(game.cover_url) and not game.cover_url.startswith("/files/"):
+                game.cover_url = _legacy_cover_path(game.cover_url) or game.cover_url
             game.slug = slug
 
         session.flush()
@@ -318,7 +330,12 @@ def _store_label(value):
     return host.removeprefix("www.")
 
 
-def get_game_files(session, game_id):
+def file_href(slug, file_id):
+    return f"/{slug}/files/{file_id}"
+
+
+def get_game_files(session, game_id, slug=None):
+    slug = slug or session.scalar(select(Game.slug).where(Game.id == game_id))
     files = session.scalars(
         select(GameFile).where(GameFile.game_id == game_id).order_by(GameFile.id)
     )
@@ -328,7 +345,7 @@ def get_game_files(session, game_id):
             "platform": item.platform,
             "platform_label": PLATFORMS[item.platform],
             "name": item.original_name,
-            "href": _is_http_url(item.url) and item.url or f"/files/{item.id}",
+            "href": _is_http_url(item.url) and item.url or file_href(slug, item.id),
             "url": _is_http_url(item.url) and item.url or None,
             "stored_name": item.stored_name,
         }
@@ -351,14 +368,19 @@ def get_game(session, game_id):
     game = session.get(Game, game_id)
     if not game:
         return None
-    files = get_game_files(session, game_id)
+    files = get_game_files(session, game_id, game.slug)
+    cover = _public_cover_url(game.cover_url or "") or _public_cover_url(_legacy_cover_url(game.cover))
+    raw_cover = re.fullmatch(r"/files/(\d+)", cover)
+    if raw_cover:
+        cover = file_href(game.slug, raw_cover.group(1))
+    elif cover.startswith("/download/"):
+        cover = _legacy_cover_path(cover) or cover
     return {
         "id": game.id,
         "title": game.title,
         "description": game.description or "",
         "note": game.note or "",
-        "cover": _public_cover_url(game.cover_url or "")
-        or _public_cover_url(_legacy_cover_url(game.cover)),
+        "cover": cover,
         "ttb": game.time or "",
         "players": game.players or "",
         "category": [item.name for item in game.categories],

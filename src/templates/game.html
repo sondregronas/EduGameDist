@@ -63,9 +63,9 @@
         {% endif %}
       </div>
 
-      {% if game.note %}<div class="callout view-only">{{ icon('info') }}<p>{{ game.note }}</p></div>{% endif %}
+      {% if game.note %}<div class="callout view-only">{{ icon('info') }}<div class="callout-text">{{ game.note|rich_text }}</div></div>{% endif %}
       {% if admin %}
-        <label class="field edit-only"><span>Merknad som vises på spillsiden (f.eks. tips til lærere)</span>
+        <label class="field edit-only"><span>Merknad som vises på spillsiden (f.eks. tips til lærere). Lenker (&lt;a href&gt;), &lt;br&gt;, &lt;b&gt;, &lt;i&gt;, &lt;ul&gt; og &lt;li&gt; støttes.</span>
           <textarea class="ghost ghost-text" data-field="note" rows="2" placeholder="Valgfritt">{{ game.note }}</textarea></label>
       {% endif %}
 

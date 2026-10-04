@@ -14,6 +14,7 @@ from sqlalchemy.orm import Session
 sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 
 import app as app_module
+import database
 import stores
 from app import create_admin_app, create_public_app
 from stores import FetchError
@@ -215,7 +216,9 @@ class EduGameDistAppTests(unittest.TestCase):
         with patch("app._fetch", side_effect=fetch):
             game_id, slug = self.create_game(cover_url="https://cdn.example/header.jpg")
             first = self.admin_client.get(f"/api/games/{game_id}").json["cover_url"]
-            self.assertRegex(first, r"^/files/\d+$")
+            self.assertRegex(first, r"^/[\w-]+/files/\d+$")
+            old = self.public_client.get("/files/" + first.rsplit("/", 1)[1])
+            self.assertEqual((old.status_code, old.headers["Location"]), (301, first))
             download = self.public_client.get(first)
             self.assertEqual(download.data, image)
             download.close()
@@ -351,6 +354,25 @@ class EduGameDistAppTests(unittest.TestCase):
         self.assertEqual(self.public_client.get("/install").status_code, 200)
         self.assertEqual(self.public_client.get(f"/{slug}").status_code, 200)
 
+    def test_note_renders_safe_html(self):
+        from richtext import rich_text
+
+        rendered = str(rich_text(
+            'Fra EWC.<br><a href="https://x.org/a.pdf" onclick="x()">Ressurshefte</a>'
+            '<script>alert(1)</script><a href="javascript:alert(1)">bad</a><img src=x onerror=y>\nny linje'
+        ))
+        self.assertIn('<a href="https://x.org/a.pdf" target="_blank" rel="noopener noreferrer">Ressurshefte</a>', rendered)
+        self.assertIn("EWC.<br><a", rendered)
+        self.assertNotIn("onclick", rendered)
+        self.assertNotIn("alert", rendered.replace("bad", ""))
+        self.assertNotIn("javascript", rendered)
+        self.assertNotIn("<img", rendered)
+        self.assertIn("<br>ny linje", rendered)
+        self.assertEqual(str(rich_text("a < b & c")), "a &lt; b &amp; c")
+        game_id, slug = self.create_game(note='Hei<br><a href="https://x.org/">lenke</a>')
+        page = self.public_client.get(f"/{slug}").data.decode()
+        self.assertIn('<a href="https://x.org/" target="_blank"', page)
+
     def test_human_size_uses_norwegian_decimal_comma(self):
         self.assertEqual(app_module._human_size(999), "999 B")
         self.assertEqual(app_module._human_size(1_500_000), "1,5 MB")
@@ -395,6 +417,11 @@ class EduGameDistAppTests(unittest.TestCase):
             self.assertEqual(len(downloads), 1)
             self.assertEqual(downloads[0].stored_name, "legacy/windows/old-build.zip")
             self.assertEqual(game.cover_url, "/legacy-covers/legacy.jpg")
+            self.assertEqual(database._legacy_cover_url("/download/noco/Games/Games/Cover/w0CeOl.jpg"), "/legacy-covers/w0CeOl.jpg")
+            self.assertEqual(
+                database._legacy_cover_url(json.dumps([{"path": "download/noco/Games/Games/Cover/a%20b.jpg"}])),
+                "/legacy-covers/a b.jpg",
+            )
             self.assertIsNotNone(session.get(AppMigration, "legacy-metadata-v2"))
 
 

@@ -2,6 +2,7 @@ import re
 import shutil
 import tempfile
 from pathlib import Path
+from urllib.parse import urlparse
 
 from sqlalchemy.orm import Session
 
@@ -34,7 +35,22 @@ SAMPLES = [
     },
     {
         "title": "Oslo 2084",
-        "description": "Embla og robotvennen Moppy møter utfordringer om demokrati og teknologi i Oslo i framtiden.",
+        "description": (
+            "I Oslo 2084 styrer spilleren Embla, en ung jente som bruker tiden sin på hobbyhacking og "
+            "programmering av sin egen robotvenn, støvsugeren Moppy. I Oslo 2084 er byen i stadig større grad "
+            "styrt av kunstig intelligens og ny teknologi. Embla og Moppy må løse ulike utfordringer og "
+            "demokratiske dilemma for å bevege seg gjennom de ulike nivåene i spillet og kjempe mot "
+            "anti-demokratiske krefter."
+        ),
+        "note": (
+            "Fra Demokrativerksted hos Utøya (Europeiske Wergeland Centre).<br>"
+            '<a href="https://theewc.org/content/uploads/sites/7/2021/10/Hefte-Oslo-2084-1-1.pdf">'
+            "Trykk her for Ressurshefte.pdf</a>"
+        ),
+        "developer": "Anansi AS",
+        "developer_link": "https://demokrativerksted.no/spill",
+        "browser_url": "https://anansigames.itch.io/oslo2084",
+        "links": ["https://anansigames.itch.io/oslo2084"],
         "cover": "oslo2084.png",
         "categories": ["Demokrati", "Norsk"],
         "players": "1",
@@ -97,6 +113,10 @@ def main():
                 game = Game(
                     title=sample["title"],
                     description=sample["description"],
+                    note=sample.get("note"),
+                    developer=sample.get("developer"),
+                    developer_link=sample.get("developer_link"),
+                    browser_url=sample.get("browser_url"),
                     cover_url=f"{BASE}/demo-img/{sample['cover']}",
                     players=sample["players"],
                     time=sample["time"],
@@ -109,12 +129,8 @@ def main():
                     for index, name in enumerate(sample["categories"])
                 ]
                 game.store_links = [
-                    GameStoreLink(
-                        game_id=game.id,
-                        url="https://store.steampowered.com/",
-                        label="Steam",
-                        position=0,
-                    )
+                    GameStoreLink(game_id=game.id, url=url, label=urlparse(url).hostname or url, position=index)
+                    for index, url in enumerate(sample.get("links") or ["https://store.steampowered.com/"])
                 ]
                 for platform, filename in sample["files"]:
                     session.add(

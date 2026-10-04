@@ -21,6 +21,7 @@ from flask import (
     current_app,
     g,
     jsonify,
+    redirect,
     render_template,
     request,
     send_file,
@@ -38,6 +39,7 @@ from database import (
     GameStoreLink,
     PLATFORMS,
     all_category_names,
+    file_href,
     get_game,
     initialize_db,
     list_games,
@@ -45,6 +47,7 @@ from database import (
     unique_slug,
 )
 from auth import configure_auth
+from richtext import rich_text
 from stores import FetchError, discover_store_links, steam_search, store_catalog, store_info
 
 
@@ -224,6 +227,7 @@ def _open_app(mode, data_dir=None):
                 session.rollback()
             session.close()
 
+    app.jinja_env.filters["rich_text"] = rich_text
     app.jinja_env.filters["hue"] = lambda value: zlib.crc32(str(value).encode("utf-8")) % 360
 
     @app.context_processor
@@ -252,9 +256,18 @@ def _open_app(mode, data_dir=None):
         return response
 
     @app.get("/files/<int:file_id>")
-    def get_file(file_id):
+    def get_file_legacy_url(file_id):
         item = g.db.get(GameFile, file_id)
-        if not item or not item.stored_name:
+        game = item and g.db.get(Game, item.game_id)
+        if not game:
+            abort(404)
+        return redirect(file_href(game.slug, file_id), code=301)
+
+    @app.get("/<slug>/files/<int:file_id>")
+    def get_file(slug, file_id):
+        item = g.db.get(GameFile, file_id)
+        game = item and g.db.get(Game, item.game_id)
+        if not item or not item.stored_name or not game or game.slug != slug:
             abort(404)
         path = _stored_path(item.stored_name)
         if not path or not path.is_file():
@@ -573,7 +586,7 @@ def _configure_admin(app):
             raise
         return jsonify(
             id=item.id,
-            href=f"/files/{item.id}",
+            href=file_href(game.slug, item.id),
             name=file_name,
             platform=platform,
             size=received,
@@ -669,10 +682,20 @@ def _localize_cover(game):
     return None
 
 
+def _canonical_cover_url(value):
+    """Covers are stored as /files/<id>; the public URL /<slug>/files/<id> maps back to that."""
+    value = value.split("?")[0] if value.startswith("/") else value
+    match = re.fullmatch(r"/[^/]+/files/(\d+)", value)
+    return f"/files/{match.group(1)}" if match else value
+
+
 def _apply_values(game, values):
     for key in ("title", "description", "note", "time", "players", "developer", "developer_link", "browser_url", "steam_app_id", "cover_url"):
         if key in values:
-            setattr(game, key, values[key])
+            value = values[key]
+            if key == "cover_url" and isinstance(value, str):
+                value = _canonical_cover_url(value)
+            setattr(game, key, value)
     if "categories" in values:
         game.categories.clear()
         g.db.flush()

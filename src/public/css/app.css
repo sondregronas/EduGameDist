@@ -199,7 +199,10 @@ a.link-pill:hover { text-decoration: none; transform: translateY(-2px); box-shad
 .game-title { font-size: clamp(1.8rem, 4vw, 2.8rem); line-height: 1.1; font-weight: 800; letter-spacing: -.02em; }
 .game-developer { color: var(--muted); }
 .game-description { font-size: 1.08rem; line-height: 1.7; white-space: pre-line; }
-.callout p { white-space: pre-line; }
+.callout-text { min-width: 0; overflow-wrap: anywhere; }
+.callout-text p { margin: 0 0 .5rem; }
+.callout-text a { color: var(--accent); text-decoration: underline; }
+.callout-text ul, .callout-text ol { margin: .3rem 0; padding-left: 1.3rem; }
 .downloads { margin-top: 2.4rem; }
 .downloads h2, .guide-card h2 { font-size: 1.5rem; font-weight: 800; display: flex; align-items: center; gap: .6rem; margin-bottom: .3rem; }
 .platform-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(300px, 1fr)); gap: 1rem; margin-top: 1rem; }
