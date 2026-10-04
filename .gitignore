@@ -128,7 +128,6 @@ dist
 
 .idea/
 gamedb.db
-src/public/img/
 src/demo/
 src/data/
 __pycache__/
