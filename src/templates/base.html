@@ -4,22 +4,24 @@
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
-  <title>{% if title and title != site_title %}{{ title }} · {% endif %}{{ site_title }}{% if admin %} (admin){% endif %}</title>
-  <link rel="stylesheet" href="/assets/cfg/override.css">
+  <title>{% if title and title != site.title %}{{ title }} · {% endif %}{{ site.title }}{% if admin %} (admin){% endif %}</title>
   <link rel="stylesheet" href="/assets/css/app.css">
-  <link rel="icon" href="/assets/cfg/favicon.ico">
+  <link rel="icon" href="{{ site.favicon_url }}">
   {% block head %}{% endblock %}
 </head>
 <body class="{% if admin %}is-admin{% endif %}">
   <header class="site-header">
     <div class="wrap header-inner">
-      <a class="brand" href="/">{{ icon('gamepad') }}<span>{{ site_title }}</span>{% if admin %}<span class="badge badge-admin">Admin</span>{% endif %}</a>
+      <a class="brand" href="/">{% if site.logo_url %}<img class="brand-logo" src="{{ site.logo_url }}" alt="">{% else %}{{ icon('gamepad') }}{% endif %}<span>{{ site.title }}</span>{% if admin %}<span class="badge badge-admin">Admin</span>{% endif %}</a>
       <nav class="site-nav" aria-label="Hovedmeny">
-        <a href="/">{{ icon('gamepad') }}<span>Spill</span></a>
-        <a href="/install">{{ icon('book') }}<span>Installasjon</span></a>
-        <a href="/vilkar">{{ icon('shield') }}<span>Vilkår</span></a>
-        {% if admin %}<a href="{{ public_url }}" target="_blank" rel="noopener noreferrer">{{ icon('external') }}<span>Åpne nettsiden</span></a>{% endif %}
-        {% if auth_enabled and session.get('auth') %}<form method="post" action="/logout" class="logout-form"><button type="submit" class="nav-button">{{ icon('logout') }}<span>Logg ut</span></button></form>{% endif %}
+        {% for item in site.nav if not item.hidden %}
+          <a href="{{ item.href }}"{% if not item.builtin %} class="nav-custom"{% endif %}{% if item.new_tab %} target="_blank" rel="noopener noreferrer"{% endif %} title="{{ item.text }}">{{ icon(item.icon) }}<span>{{ item.text }}</span></a>
+        {% endfor %}
+        {% if admin %}
+          <a href="/settings" title="Innstillinger">{{ icon('cog') }}<span>Innstillinger</span></a>
+          <a href="{{ public_url }}" target="_blank" rel="noopener noreferrer" title="Åpne nettsiden">{{ icon('external') }}<span>Åpne nettsiden</span></a>
+        {% endif %}
+        {% if auth_enabled and logged_in %}<form method="post" action="/logout" class="logout-form"><button type="submit" class="nav-button" title="Logg ut">{{ icon('logout') }}<span>Logg ut</span></button></form>{% endif %}
       </nav>
     </div>
   </header>

@@ -1,0 +1,94 @@
+{% extends "base.html" %}
+{% from "_macros.html" import icon %}
+{% block head %}
+  <script src="/assets/js/admin.js" defer></script>
+{% endblock %}
+{% block content %}
+<article class="settings" id="settings">
+  <section class="hero hero-left">
+    <h1>Innstillinger</h1>
+    <p>Endringene vises på den offentlige nettsiden så snart de er lagret.</p>
+  </section>
+
+  <nav class="settings-jump" aria-label="Innstillinger">
+    <a href="#site">Nettstedet</a><a href="#frontpage">Forsiden</a><a href="#menu">Meny</a><a href="#pages">Sider</a><a href="#password">Passord</a>
+  </nav>
+
+  <form id="settings-form" class="settings-form" autocomplete="off">
+    <section class="settings-card" id="site">
+      <header>{{ icon('gamepad') }}<h2>Nettstedet</h2></header>
+      <label class="field"><span>Tittel (øverst til venstre og i nettleserfanen)</span>
+        <input id="site-title" maxlength="100" placeholder="{{ default_title }}"></label>
+      <div class="field">
+        <span>Logo (vises øverst til venstre og som ikon i nettleserfanen)</span>
+        <div class="logo-row">
+          <div class="logo-preview" id="logo-preview">{% if site.logo_url %}<img src="{{ site.logo_url }}" alt="">{% else %}{{ icon('gamepad') }}{% endif %}</div>
+          <label class="btn btn-small">{{ icon('upload') }}Last opp logo<input type="file" id="logo-file" accept="image/png,image/jpeg,image/webp,image/gif,image/x-icon,.ico" hidden></label>
+          <button type="button" class="btn btn-small btn-ghost" id="logo-remove"{% if not site.logo_url %} hidden{% endif %}>{{ icon('trash') }}Bruk standardikonet</button>
+        </div>
+        <p class="hint">Bruk et kvadratisk bilde, for eksempel 256 × 256 piksler (PNG, JPEG, WebP, GIF eller ICO, maks 2 MB). Logoen lagres med en gang.</p>
+      </div>
+    </section>
+
+    <section class="settings-card" id="frontpage">
+      <header>{{ icon('browser') }}<h2>Forsiden</h2></header>
+      <label class="field"><span>Overskrift</span>
+        <input id="hero-title" maxlength="200" placeholder="Samme som tittelen"></label>
+      <label class="field"><span>Tekst under overskriften. Lenker (&lt;a href="…"&gt;), &lt;b&gt;, &lt;i&gt; og &lt;br&gt; støttes, for eksempel en lenke til et skjema for å ønske seg spill.</span>
+        <textarea id="hero-text" rows="2" maxlength="2000"></textarea></label>
+    </section>
+
+    <section class="settings-card" id="menu">
+      <header>{{ icon('link') }}<h2>Meny</h2></header>
+      <p class="hint">Flytt punktene med pilene. De innebygde sidene kan få nytt navn eller skjules, og egne lenker kan legges hvor som helst i menyen.</p>
+      <ol class="nav-editor" id="nav-editor"></ol>
+      <div><button type="button" class="tag-add-btn" id="nav-add">{{ icon('plus') }}<span>Ny lenke</span></button></div>
+    </section>
+
+    <section class="settings-card" id="pages">
+      <header>{{ icon('edit') }}<h2>Sider</h2></header>
+      <p class="hint">Teksten skrives med enkel HTML. <code>&lt;h1&gt;</code> og avsnittet under blir sideoverskriften, hver <code>&lt;h2&gt;</code> starter et nytt kort (velg ikon med for eksempel <code>&lt;h2 data-icon="windows"&gt;</code>), <code>&lt;blockquote&gt;</code> blir en uthevet merknad, og alt etter <code>&lt;hr&gt;</code> vises som en fotnote. Lenker, <code>&lt;p&gt;</code>, <code>&lt;b&gt;</code>, <code>&lt;i&gt;</code>, <code>&lt;small&gt;</code>, <code>&lt;ul&gt;</code>, <code>&lt;ol&gt;</code> og <code>&lt;li&gt;</code> støttes. La feltet stå tomt for å bruke standardteksten.</p>
+      {% for name, page in pages.items() %}
+        <div class="page-editor" data-page="{{ name }}">
+          <div class="page-editor-head">
+            <span class="field-label">{{ page.title }}</span>
+            <a class="help-link" href="{{ page.route }}" target="_blank" rel="noopener noreferrer">{{ icon('external') }}<span>Vis siden</span></a>
+            <button type="button" class="btn btn-small btn-ghost" data-default>{{ icon('sync') }}Sett inn standardteksten</button>
+          </div>
+          <textarea class="ghost code" rows="12" spellcheck="false" placeholder="Standardteksten brukes" aria-label="{{ page.title }}"></textarea>
+        </div>
+      {% endfor %}
+    </section>
+
+    <div class="settings-actions">
+      <button type="submit" class="btn btn-primary" id="settings-save">{{ icon('save') }}Lagre innstillingene</button>
+    </div>
+  </form>
+
+  <section class="settings-card" id="password">
+    <header>{{ icon('lock') }}<h2>Passord for admin</h2></header>
+    <p class="hint">
+      {% if password.source == 'stored' %}
+        Admin bruker passordet som er lagret her.
+        {% if password.env_set %}Fjerner du det, brukes passordet fra miljøvariabelen <code>ADMIN_PASSWORD</code> igjen.{% else %}Fjerner du det, slås innloggingen av, siden <code>ADMIN_PASSWORD</code> ikke er satt.{% endif %}
+      {% elif password.source == 'env' %}
+        Admin bruker passordet fra miljøvariabelen <code>ADMIN_PASSWORD</code>. Et passord du lagrer her, brukes i stedet.
+      {% else %}
+        Innlogging er slått av. Lagrer du et passord her, må alle logge inn for å bruke admin.
+      {% endif %}
+      {% if password.source %}Alle andre blir logget ut når passordet endres.{% endif %}
+    </p>
+    <form id="password-form" class="password-form" data-source="{{ password.source or '' }}" data-env="{{ 'true' if password.env_set else 'false' }}">
+      {% if password.source %}<label class="field"><span>Nåværende passord</span><input type="password" id="password-current" autocomplete="current-password" required></label>{% endif %}
+      <label class="field"><span>Nytt passord (minst 8 tegn)</span><input type="password" id="password-new" autocomplete="new-password" minlength="8" required></label>
+      <label class="field"><span>Gjenta nytt passord</span><input type="password" id="password-repeat" autocomplete="new-password" minlength="8" required></label>
+      <div class="settings-actions">
+        {% if password.source == 'stored' %}<button type="button" class="btn btn-danger" id="password-remove">{{ icon('trash') }}Fjern lagret passord</button>{% endif %}
+        <button type="submit" class="btn btn-primary">{{ icon('check') }}{{ 'Endre passord' if password.source else 'Slå på innlogging' }}</button>
+      </div>
+    </form>
+  </section>
+
+  <script type="application/json" id="settings-data">{{ data|tojson }}</script>
+</article>
+{% endblock %}

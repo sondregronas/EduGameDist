@@ -1,7 +1,12 @@
-# Administrasjon
+# Admin
 
-Administrasjonsappen er en egen Flask-tjeneste på port 8081 inne i Docker-nettverket `edugamedist_proxy_access`. Den publiserer ikke porten direkte på vertsmaskinen, og kan beskyttes med et passord i `ADMIN_PASSWORD` (se [Begrense tilgang](Access.md)). **Nginx Proxy Manager bør i tillegg bestemme hvem som får tilgang.**
+The admin app is a separate Flask service on port 8081 inside the Docker network `edugamedist_proxy_access`. It does not publish the port on the host, and it can be protected with a password (see [Restricting access](Access.md)). **Nginx Proxy Manager should also decide who gets access.**
 
-Koble NPM-containeren til Docker-nettverket, og opprett en proxy host til `http://admin:8081`. Velg en NPM Access List med ønsket tilgangsregel. Ikke proxy admin uten en slik tilgangsregel, og ikke legg til en offentlig `ports:`-mapping.
+Connect the NPM container to the Docker network and create a proxy host for `http://admin:8081`. Choose an NPM Access List with the access rule you want. Do not proxy admin without such a rule, and do not add a public `ports:` mapping.
 
-Åpne admin-adressen for å legge til eller redigere spill. Endringer i metadata blir synlige på den offentlige nettsiden når du lagrer. Filer kan lastes opp flere ganger per spill og plattform. Se [Docker-installasjon](docker.md) for innstillinger for store opplastinger.
+Open the admin address to add or edit games. Changes become visible on the public site as soon as you save. Files can be uploaded several times per game and platform. See [Docker installation](docker.md) for the settings needed for large uploads.
+
+From the admin front page you can also:
+
+- hide or show a game for visitors with the eye icon on its cover (see [Modifying games](../Usage/Modifying-games.md)),
+- open **Innstillinger** (Settings) in the menu to change the title, logo, front page, menu, pages and password (see [Personalization](../Usage/Personalization.md)).

@@ -130,6 +130,8 @@ dist
 gamedb.db
 src/demo/
 src/data/
+src/public/games/*/*
+!src/public/games/*/Games go here.txt
 __pycache__/
 **/__pycache__/
 .venv/

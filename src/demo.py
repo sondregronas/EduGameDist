@@ -84,12 +84,14 @@ def _static_paths(html, slugs):
 
     def href(match):
         path, fragment = match.group(1), match.group(2) or ""
+        path, query = (path.split("?", 1) + [""])[:2]
+        query = f"?{query}" if query else ""
         if path.startswith("assets/"):
             return f'href="{BASE}/{path}{fragment}"'
         if path.startswith("files/"):
             return 'href="#"'
         if path in pages:
-            return f'href="{BASE}/{pages[path]}{fragment}"'
+            return f'href="{BASE}/{pages[path]}{query}{fragment}"'
         return match.group(0)
 
     html = re.sub(r'href="/([^"#]*)(#[^"]*)?"', href, html)

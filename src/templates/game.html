@@ -13,8 +13,16 @@
 <article id="game"{% if admin %} data-game-id="{{ game.id }}"{% endif %}>
   <div class="crumbs">
     <a class="back-link" href="/">{{ icon('back') }}Alle spill</a>
-    {% if admin %}<button type="button" class="btn btn-primary" id="edit-toggle">{{ icon('edit') }}Rediger</button>{% endif %}
+    {% if admin %}
+      <div class="crumb-actions">
+        <button type="button" class="btn" id="visibility-toggle" aria-pressed="{{ 'true' if game.hidden else 'false' }}">{{ icon('eye-off' if game.hidden else 'eye') }}{{ 'Skjult' if game.hidden else 'Synlig' }}</button>
+        <button type="button" class="btn btn-primary" id="edit-toggle">{{ icon('edit') }}Rediger</button>
+      </div>
+    {% endif %}
   </div>
+  {% if admin %}
+    <div class="notice notice-warn" id="hidden-notice"{% if not game.hidden %} hidden{% endif %}>{{ icon('eye-off') }}<span>Spillet er skjult og vises ikke på den offentlige nettsiden.</span></div>
+  {% endif %}
 
   <section class="game-hero">
     <div class="game-media">
@@ -56,7 +64,7 @@
       <div class="chips">
         {% if game.players %}<span class="chip view-only">{{ icon('user' if game.players == '1' else 'users') }}{{ game.players }} {{ 'spiller' if game.players == '1' else 'spillere' }}</span>{% endif %}
         {% if game.ttb %}<span class="chip view-only">{{ icon('clock') }}{{ game.ttb }}</span>{% endif %}
-        {% for category in game.category %}<span class="tag view-only" style="--h: {{ category|hue }}">{{ category }}</span>{% endfor %}
+        {% for category in game.category %}<a class="tag view-only" style="--h: {{ category|hue }}" href="/?category={{ category|lower|urlencode }}" title="Vis alle spill i «{{ category }}»">{{ category }}</a>{% endfor %}
         {% if admin %}
           <label class="chip chip-edit edit-only">{{ icon('users') }}<input data-field="players" value="{{ game.players }}" placeholder="Spillere (1 eller 2–4)" size="20"></label>
           <label class="chip chip-edit edit-only">{{ icon('clock') }}<input data-field="time" value="{{ game.ttb }}" placeholder="Spilletid (30 min)" size="20"></label>
@@ -112,7 +120,7 @@
               <ul class="file-list">
                 {% for file in files %}
                   <li data-file-id="{{ file.id }}">
-                    <a class="download-btn" href="{{ file.href }}"{% if file.url %} target="_blank" rel="noopener noreferrer"{% endif %}>{{ icon('download') }}<span class="file-name">{{ file.name }}</span>{% if file.size_text %}<span class="file-size">{{ file.size_text }}</span>{% endif %}</a>
+                    <a class="download-btn" href="{{ file.href }}"{% if file.url %} target="_blank" rel="noopener noreferrer"{% endif %}>{{ icon('download') }}<span class="file-name" title="{{ file.name }}">{{ file.name }}</span>{% if file.size_text %}<span class="file-size">{{ file.size_text }}</span>{% endif %}</a>
                     {% if admin %}<button type="button" class="icon-btn danger edit-only file-delete" aria-label="Slett {{ file.name }}">{{ icon('trash') }}</button>{% endif %}
                   </li>
                 {% endfor %}

@@ -1,34 +1,34 @@
-# Docker-installasjon
+# Docker installation
 
-EduGameDist består av to Flask-apper som deler SQLite-database og fillager:
+EduGameDist consists of two Flask apps that share an SQLite database and file storage:
 
-- **Frontend** viser spill og filer. Den har ingen endepunkter for å endre innhold.
-- **Admin** lar deg redigere spill og laste opp filer. Den er ikke publisert på en vertsport; tilgang skal styres av Nginx Proxy Manager (NPM).
+- **Frontend** shows the games and files. It has no endpoints for changing content.
+- **Admin** lets you edit games, upload files and change the site settings. It is not published on a host port; access is controlled by Nginx Proxy Manager (NPM).
 
 ## Start
 
-Kopier `docker-compose.yml` til en egen mappe og start tjenestene:
+Copy [`docker-compose.yml`](https://github.com/sondregronas/EduGameDist/blob/main/docker-compose.yml) to a folder of its own and start the services:
 
 ```bash
 docker compose up -d
 ```
 
-Frontend blir tilgjengelig på port 80. Docker Compose oppretter også nettverket `edugamedist_proxy_access`. Koble NPM-containeren til nettverket:
+The frontend becomes available on port 80. Docker Compose also creates the network `edugamedist_proxy_access`. Connect the NPM container to it:
 
 ```bash
-docker network connect edugamedist_proxy_access <NPM-container>
+docker network connect edugamedist_proxy_access <NPM container>
 ```
 
-I NPM oppretter du en Proxy Host med:
+In NPM, create a Proxy Host with:
 
 - **Forward Hostname / IP:** `admin`
 - **Forward Port:** `8081`
 - **Scheme:** `http`
-- **Access List:** velg en liste som bare gir tilgang til godkjente brukere eller nettverk
+- **Access List:** choose a list that only allows approved users or networks
 
-Ikke legg til en `ports:`-mapping for admin-tjenesten. Docker-nettverket og NPM skal være veien inn til administrasjonen. Begrens også den offentlige frontend-tjenesten med NPM eller brannmur hvis spillene ikke skal være tilgjengelige for alle.
+Do not add a `ports:` mapping to the admin service. The Docker network and NPM should be the way into the admin app. Restrict the public frontend with NPM or a firewall as well if the games should not be available to everyone.
 
-For at store filer skal kunne lastes opp gjennom NPM, legg til følgende i NPM-vertens **Advanced**-felt:
+For large uploads to work through NPM, add the following to the host's **Advanced** field:
 
 ```nginx
 client_max_body_size 0;
@@ -37,12 +37,31 @@ proxy_read_timeout 3600s;
 proxy_send_timeout 3600s;
 ```
 
-Filer lastes opp i én strømmet forespørsel og lagres uendret. `client_max_body_size 0` fjerner proxyens størrelsesgrense, og `proxy_request_buffering off` hindrer at NPM mellomlagrer hele filen på disk først. Det finnes ingen samlet opplastingsgrense i appen; reell kapasitet bestemmes av ledig diskplass. SQLite-database og opplastede filer ligger i Docker-volumene `game_db` og `game_covers`.
+Files are uploaded in a single streamed request and stored unchanged. `client_max_body_size 0` removes the proxy's size limit, and `proxy_request_buffering off` stops NPM from buffering the whole file on disk first. The app has no upload limit of its own; the real capacity is the free disk space.
 
-## Eksisterende installasjoner
+## Where data is stored
 
-Den eksisterende `game_db`-volumstrukturen beholdes. Ved oppstart migreres spill, kategorier, butikklenker og plattformnedlastinger fra den gamle SQLite-tabellen automatisk til den nye strukturen. Behold sikkerhetskopi av begge volumene før oppgradering. NocoDB-tjenesten startes ikke lenger; slett ikke de gamle volumene før du har kontrollert at spill, omslag og nedlastinger er med.
+| Location | Contents |
+| --- | --- |
+| `./games/<Platform>/<game>/` (bind mount at `/app/public/games`) | Uploaded game files under their original names, e.g. `./games/Windows/oslo-2084/Oslo2084-Setup.zip`. The admin container mounts it read-write, the frontend read-only. |
+| `game_db` volume (`/app/data`) | The SQLite database, cover images, the uploaded logo and the session key. |
+| `game_covers` volume (`/app/data/legacy-covers`) | Cover images migrated from NocoDB (older installations only). |
 
-## Konfigurasjon
+The `<game>` folder is the game's address on the site (its slug). When a game is renamed, its folders are renamed with it, and they are removed when the last file is deleted. You can back up or browse `./games` directly, but add and remove files through the admin app so the database stays in sync.
 
-Endre `TITLE` og `PUBLIC_URL` i `docker-compose.yml`. Spillfiler som var lagt inn manuelt kan fortsatt monteres fra `./games/<plattform>`. Konfigurasjonsfiler for CSS/favikon kan monteres fra `./cfg`.
+The Docker image only writes game files to `/app/public/games` when it is a mounted volume, so files can never end up inside a container that is replaced on the next update. Without the mount, new game files are kept in the `game_db` volume and admin shows a warning.
+
+## Configuration
+
+| Variable | Service | Purpose |
+| --- | --- | --- |
+| `ADMIN_PASSWORD` | admin | Password for the admin login. Empty means no login. A password saved under **Innstillinger** (Settings) in admin takes precedence. See [Restricting access](Access.md). |
+| `PUBLIC_URL` | admin | Address of the public site, used by the **Åpne nettsiden** (Open website) link in admin. |
+| `TITLE` | both | Default site title until one is saved under Settings. |
+| `SECRET_KEY` | admin | Optional key for signing login sessions. Generated and stored in `game_db` when not set. |
+
+Everything else (title, logo, front page text, menu, the installation guide and the terms) is changed under **Innstillinger** (Settings) in admin. See [Personalization](../Usage/Personalization.md).
+
+## Existing installations
+
+See [Updating](../Updating.md). The database is migrated automatically on startup, and uploads from older versions are moved into `./games/<Platform>/<game>/`.

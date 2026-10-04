@@ -1,0 +1,24 @@
+{% extends "base.html" %}
+{% from "_macros.html" import icon %}
+{% block content %}
+<article class="guide page-{{ page_name }}">
+  {% if admin %}<p class="page-edit"><a class="btn btn-small" href="/settings#pages">{{ icon('edit') }}Rediger teksten</a></p>{% endif %}
+  {% if page.intro %}<section class="hero hero-left rich">{{ page.intro }}</section>{% endif %}
+
+  {% set platform_sections = page.sections | selectattr('id', 'in', ['windows', 'mac', 'linux', 'android']) | list %}
+  {% if platform_sections %}
+    <nav class="guide-picker" aria-label="Velg plattform">
+      {% for section in platform_sections %}<a href="#{{ section.id }}">{{ icon(section.id) }}<span>{{ section.heading|striptags }}</span></a>{% endfor %}
+    </nav>
+  {% endif %}
+
+  {% for section in page.sections %}
+    <section class="guide-card rich" id="{{ section.id }}">
+      <header>{{ icon(section.icon or default_icon) }}<h2>{{ section.heading }}</h2></header>
+      {{ section.body }}
+    </section>
+  {% endfor %}
+
+  {% if page.footer %}<div class="guide-footnote rich">{{ page.footer }}</div>{% endif %}
+</article>
+{% endblock %}

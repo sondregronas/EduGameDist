@@ -1,6 +1,9 @@
 FROM python:3.14-slim
 ENV PYTHONUNBUFFERED=1
 ENV DATA_DIR=/app/data
+ENV GAMES_DIR=/app/public/games
+# Game files are only written to GAMES_DIR when it is a mounted volume, so they survive image updates.
+ENV GAMES_MOUNT_REQUIRED=1
 WORKDIR /app
 COPY src/requirements.txt .
 RUN pip install --no-cache-dir -r requirements.txt

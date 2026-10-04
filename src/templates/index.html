@@ -1,29 +1,51 @@
 {% extends "base.html" %}
 {% from "_macros.html" import icon %}
 {% block head %}
-  <meta property="og:title" content="{{ site_title }}">
+  <meta property="og:title" content="{{ site.title }}">
   <meta property="og:type" content="website">
   <script src="/assets/js/search.js" defer></script>
   {% if admin %}<script src="/assets/js/admin.js" defer></script>{% endif %}
 {% endblock %}
 {% block content %}
   <section class="hero">
-    <h1>{{ site_title }}</h1>
-    <p>Get your game on</p>
+    <h1>{{ site.hero_title }}</h1>
+    {% if site.hero_text %}<div class="hero-text">{{ site.hero_text|rich_text }}</div>{% endif %}
   </section>
 
   <div class="toolbar" id="filter">
     <label class="search-box">
       {{ icon('search') }}
-      <input type="search" id="search" placeholder="Søk etter spill eller kategori" aria-label="Søk etter spill" autocomplete="off">
+      <input type="search" id="search" placeholder="Søk etter spill" aria-label="Søk etter spill" autocomplete="off">
     </label>
-    <div class="filter-chips" role="group" aria-label="Filtrer på plattform">
-      {% for key, label in [('browser', 'Nettleser'), ('windows', 'Windows'), ('mac', 'Mac'), ('linux', 'Linux'), ('android', 'Android')] %}
-        <button type="button" class="filter-chip" data-platform="{{ key }}" aria-pressed="false" hidden>{{ icon(key) }}<span>{{ label }}</span></button>
-      {% endfor %}
-    </div>
+    {% if categories %}
+      <label class="select-box">
+        {{ icon('tag') }}
+        <select id="category-filter" aria-label="Filtrer på kategori">
+          <option value="">Alle kategorier</option>
+          {% for name, count in categories %}<option value="{{ name|lower }}">{{ name }} ({{ count }})</option>{% endfor %}
+        </select>
+        {{ icon('chevron-down', 'select-caret') }}
+      </label>
+    {% endif %}
+    {% if platforms %}
+      <label class="select-box">
+        {{ icon('filter') }}
+        <select id="platform-filter" aria-label="Filtrer på plattform">
+          <option value="">Alle plattformer</option>
+          {% for key, label in platforms %}<option value="{{ key }}">{{ label }}</option>{% endfor %}
+        </select>
+        {{ icon('chevron-down', 'select-caret') }}
+      </label>
+    {% endif %}
     <span class="result-count" id="result-count" aria-live="polite"></span>
   </div>
+
+  {% if storage_warning %}
+    <div class="notice notice-warn">
+      {{ icon('warning') }}
+      <span>Spillmappen er ikke montert i admin-containeren, så nye spillfiler lagres i datavolumet i stedet for i <code>games/&lt;plattform&gt;/&lt;spill&gt;/</code>. Se <a href="https://sondregronas.github.io/EduGameDist/docs/Updating/" target="_blank" rel="noopener noreferrer">oppdateringsveiledningen</a>.</span>
+    </div>
+  {% endif %}
 
   {% if admin and remote_covers %}
     <div class="notice notice-info" id="localize-notice">
@@ -46,30 +68,38 @@
       </button>
     {% endif %}
     {% for game in games %}
-      <a class="game-card" href="/{{ game.slug }}"
+      <article class="game-card{% if game.hidden %} is-concealed{% endif %}"
          data-title="{{ game.title|lower }}"
          data-categories="{{ game.category|join('|')|lower }}"
-         data-platforms="{{ game.platforms|join(' ') }}">
-        <div class="card-cover">
-          {% if game.cover %}<img src="{{ game.cover }}" alt="" loading="lazy" width="460" height="215">
-          {% else %}<div class="cover-placeholder">{{ icon('gamepad') }}</div>{% endif %}
-          <div class="card-badges">
-            {% if game.players %}<span class="badge">{{ icon('user' if game.players == '1' else 'users') }}{{ game.players }}</span>{% endif %}
-            {% if game.ttb %}<span class="badge">{{ icon('clock') }}{{ game.ttb }}</span>{% endif %}
-          </div>
-        </div>
-        <div class="card-body">
-          <h2 class="card-title">{{ game.title }}</h2>
-          <div class="card-footer">
-            <div class="card-tags">
-              {% for category in game.category[:3] %}<span class="tag" style="--h: {{ category|hue }}">{{ category }}</span>{% endfor %}
-            </div>
-            <div class="card-platforms" aria-label="Plattformer">
-              {% for platform in game.platforms %}<span title="{{ platform|capitalize }}">{{ icon(platform) }}</span>{% endfor %}
+         data-platforms="{{ game.platforms|join(' ') }}"{% if admin %}
+         data-game-id="{{ game.id }}"{% endif %}>
+        <a class="card-link" href="/{{ game.slug }}">
+          <div class="card-cover">
+            {% if game.cover %}<img src="{{ game.cover }}" alt="" loading="lazy" width="460" height="215">
+            {% else %}<div class="cover-placeholder">{{ icon('gamepad') }}</div>{% endif %}
+            <div class="card-badges">
+              {% if game.players %}<span class="badge">{{ icon('user' if game.players == '1' else 'users') }}{{ game.players }}</span>{% endif %}
+              {% if game.ttb %}<span class="badge">{{ icon('clock') }}{{ game.ttb }}</span>{% endif %}
             </div>
           </div>
-        </div>
-      </a>
+          <div class="card-body">
+            <h2 class="card-title">{{ game.title }}</h2>
+            <div class="card-footer">
+              <div class="card-tags">
+                {% for category in game.category[:3] %}<span class="tag" style="--h: {{ category|hue }}">{{ category }}</span>{% endfor %}
+              </div>
+              <div class="card-platforms" aria-label="Plattformer">
+                {% for platform in game.platforms %}<span title="{{ platform|capitalize }}">{{ icon(platform) }}</span>{% endfor %}
+              </div>
+            </div>
+          </div>
+        </a>
+        {% if admin %}
+          <button type="button" class="card-eye" aria-pressed="{{ 'true' if game.hidden else 'false' }}"
+                  title="{{ 'Skjult for besøkende. Klikk for å vise spillet.' if game.hidden else 'Synlig for besøkende. Klikk for å skjule spillet.' }}"
+                  aria-label="{{ ('Vis ' if game.hidden else 'Skjul ') ~ game.title }}">{{ icon('eye-off' if game.hidden else 'eye') }}</button>
+        {% endif %}
+      </article>
     {% endfor %}
   </div>
 
