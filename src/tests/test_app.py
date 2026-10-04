@@ -548,6 +548,15 @@ class EduGameDistAppTests(unittest.TestCase):
         self.assertNotIn('class="hero-text"', page)
         self.assertIn("Spill", self.admin_client.get("/settings").get_data(as_text=True))
 
+    def test_theme_switch_is_on_every_page(self):
+        _game_id, slug = self.create_game()
+        for client, path in ((self.public_client, "/"), (self.public_client, f"/{slug}"), (self.admin_client, "/settings")):
+            page = client.get(path).get_data(as_text=True)
+            self.assertIn('<script src="/assets/js/theme.js"></script>', page.split("</head>")[0])
+            self.assertEqual(page.count('name="theme"'), 3)
+        with self.public_client.get("/assets/js/theme.js") as script:
+            self.assertEqual(script.status_code, 200)
+
     def test_settings_reject_unsafe_menu_links(self):
         for url in ("javascript:alert(1)", "//evil.example", "", "#top"):
             response = self.admin_client.put("/api/settings", json={"nav": [{"key": "link", "label": "X", "url": url}]})

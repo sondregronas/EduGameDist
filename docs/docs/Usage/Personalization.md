@@ -36,6 +36,10 @@ The pages use a small subset of HTML:
 
 Cards are given an anchor from their heading, so a card titled "Windows" can be linked to as `/install#windows`. The game pages' **Hjelp** (Help) links point to `#windows` and `#mac`, and cards named after a platform get a shortcut button at the top of the page.
 
+## Themes
+
+Visitors can switch between a dark, a blue (default) and a light theme with the switch at the top right. The choice is remembered in their browser. The colours are CSS variables at the top of `src/public/css/app.css`; each theme only overrides those.
+
 ## Password
 
 See [Restricting access](../Installation/Access.md#logging-in-with-a-password).
