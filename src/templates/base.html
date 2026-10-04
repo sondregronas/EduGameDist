@@ -26,7 +26,7 @@
   <main class="wrap page">{% block content %}{% endblock %}</main>
   <footer class="site-footer">
     <div class="wrap">
-      <span style="margin: auto;">Laget med ❤️ av <a href="https://github.com/sondregronas/EduGameDist" target="_blank" rel="noopener noreferrer">Sondre Grønås</a></span>
+      <span {% if not admin %}style="margin: auto;"{% endif %}>Laget med ❤️ av <a href="https://github.com/sondregronas/EduGameDist" target="_blank" rel="noopener noreferrer">Sondre Grønås</a></span>
       {% if admin %}<a href="https://sondregronas.github.io/EduGameDist/docs/" target="_blank" rel="noopener noreferrer">Dokumentasjon</a>{% endif %}
     </div>
   </footer>
