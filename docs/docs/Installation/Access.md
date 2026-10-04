@@ -1,30 +1,41 @@
-# Begrense tilgang
+# Restricting access
 
-**Admin kan beskyttes med et passord (`ADMIN_PASSWORD`), men bør i tillegg begrenses av Nginx Proxy Manager (NPM). Ikke gjør admin-tjenesten offentlig tilgjengelig uten passord, en NPM Access List eller en tilsvarende regel.**
+**Admin can be protected with a password, but should also be restricted by Nginx Proxy Manager (NPM). Do not make the admin service publicly reachable without a password, an NPM Access List or an equivalent rule.**
 
-Admin-tjenesten er bare koblet til Docker-nettverket `edugamedist_proxy_access`; Compose publiserer ingen vertsport for den. Koble NPM-containeren til nettverket og send trafikken til `admin:8081`.
+The admin service is only connected to the Docker network `edugamedist_proxy_access`; Compose publishes no host port for it. Connect the NPM container to the network and send traffic to `admin:8081`.
 
-## Innlogging med passord
+## Logging in with a password
 
-Sett miljøvariabelen `ADMIN_PASSWORD` for admin-tjenesten (i `docker-compose.yml` eller en `.env`-fil ved siden av den):
+There are two ways to set the admin password:
 
+1. **Under Innstillinger (Settings) in admin.** The password is stored as a hash in the database and takes precedence over the environment variable. Changing it requires the current password (if one is in use).
+2. **With the environment variable `ADMIN_PASSWORD`** for the admin service (in `docker-compose.yml` or an `.env` file next to it):
+
+    ```
+    ADMIN_PASSWORD=a-long-and-unique-password
+    ```
+
+If a password is saved under Settings, it is used. If it is removed again (**Fjern lagret passord**, Remove saved password), `ADMIN_PASSWORD` applies once more. If neither is set, login is turned off and access is controlled by NPM alone. Saving a password under Settings while login is off turns it on.
+
+With login on, every admin page and API call requires signing in on a login page, and a **Logg ut** (Log out) button appears in the menu. A login lasts 7 days, and after five wrong passwords, logging in is blocked for five minutes. Changing or removing the password signs out everyone else.
+
+Use HTTPS in NPM so the password is not sent unencrypted. Sessions are signed with a key stored in `secret.key` in the data volume; set `SECRET_KEY` if you would rather manage it yourself. Changing the key also signs out everyone.
+
+If you forget a password saved under Settings, remove it from the database to fall back to `ADMIN_PASSWORD`:
+
+```bash
+docker compose exec admin python -c "import sqlite3; db = sqlite3.connect('/app/data/gamedb.db'); db.execute(\"DELETE FROM settings WHERE key = 'admin_password_hash'\"); db.commit()"
 ```
-ADMIN_PASSWORD=et-langt-og-unikt-passord
-```
 
-Alle sider og API-kall i admin krever da innlogging via en egen innloggingsside, og det vises en **Logg ut**-knapp i menyen. Innloggingen varer i 7 dager, og etter fem feil passord blir innloggingen sperret i fem minutter. Er variabelen tom eller ikke satt, er innlogging slått av.
+## Public site
 
-Bruk HTTPS i NPM slik at passordet ikke sendes ukryptert. Økter signeres med en nøkkel som lagres i `secret.key` i datavolumet; sett `SECRET_KEY` hvis du heller vil styre den selv. Skift passord eller nøkkel for å logge ut alle.
-
-## Offentlig side
-
-Spill og filer på den offentlige siden kan lastes ned av alle som når tjenesten. Bruk NPM eller brannmur for å begrense frontend dersom den bare skal brukes på skolens nettverk.
+Games and files on the public site can be downloaded by anyone who can reach it. Hidden games are not shown and their files cannot be downloaded. Use NPM or a firewall to restrict the frontend if it should only be used on the school network.
 
 ## Nginx Proxy Manager
 
-Bruk [Nginx Proxy Manager](https://nginxproxymanager.com/) for proxy-adresser og tilgangsregler. Proxy admin til `http://admin:8081` og velg en Access List som passer organisasjonens behov. Test regelen både fra et nettverk med og uten tilgang.
+Use [Nginx Proxy Manager](https://nginxproxymanager.com/) for proxy addresses and access rules. Proxy admin to `http://admin:8081` and choose an Access List that fits your organization. Test the rule from a network with and without access.
 
-Hvis du bruker IP-regler, er de vanlige private IPv4-områdene:
+If you use IP rules, the common private IPv4 ranges are:
 
 ```
 192.168.0.0/16
@@ -32,6 +43,6 @@ Hvis du bruker IP-regler, er de vanlige private IPv4-områdene:
 10.0.0.0/8
 ```
 
-## Filtilgang
+## File access
 
-Spill kan lastes opp gjennom admin-appen eller legges i en administrert mappe. For direkte filtilgang kan du bruke nettverksdeling, ekstern disk eller en beskyttet SFTP-tjeneste. Ikke eksponer fillageret eller admin-porten direkte på internett.
+Games are uploaded through the admin app and stored in `./games/<Platform>/<game>/` on the host. For direct file access (for example backups), use a network share, an external disk or a protected SFTP service. Do not expose the file storage or the admin port directly to the internet.

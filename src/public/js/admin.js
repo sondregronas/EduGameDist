@@ -34,11 +34,13 @@
     sessionStorage.setItem('flash', JSON.stringify({ message, type }))
   }
 
+  // Filer (Blob) sendes som de er, alt annet som JSON.
   async function api(method, url, body) {
+    const raw = body instanceof Blob
     const response = await fetch(url, {
       method,
-      headers: body ? { 'Content-Type': 'application/json' } : {},
-      body: body ? JSON.stringify(body) : undefined,
+      headers: body ? { 'Content-Type': raw ? 'application/octet-stream' : 'application/json' } : {},
+      body: body ? (raw ? body : JSON.stringify(body)) : undefined,
     })
     let data = {}
     try { data = await response.json() } catch { /* tomt svar */ }
@@ -170,6 +172,227 @@
       } catch (problem) {
         toast(problem.message, 'error')
         localize.disabled = false
+      }
+    })
+  }
+
+  // ---------- Skjul spill for besøkende ----------
+  const visibilityText = (hidden) => (hidden ? 'Spillet er skjult for besøkende.' : 'Spillet er synlig for besøkende igjen.')
+
+  $$('.card-eye').forEach((button) => {
+    button.addEventListener('click', async () => {
+      const card = button.closest('.game-card')
+      const hidden = button.getAttribute('aria-pressed') !== 'true'
+      button.disabled = true
+      try {
+        await api('PUT', `/api/games/${card.dataset.gameId}`, { hidden })
+        card.classList.toggle('is-concealed', hidden)
+        button.setAttribute('aria-pressed', String(hidden))
+        button.title = hidden ? 'Skjult for besøkende. Klikk for å vise spillet.' : 'Synlig for besøkende. Klikk for å skjule spillet.'
+        button.setAttribute('aria-label', `${hidden ? 'Vis' : 'Skjul'} ${$('.card-title', card).textContent}`)
+        button.replaceChildren(icon(hidden ? 'eye-off' : 'eye'))
+        toast(visibilityText(hidden), 'success')
+      } catch (problem) {
+        toast(problem.message, 'error')
+      } finally {
+        button.disabled = false
+      }
+    })
+  })
+
+  const visibility = $('#visibility-toggle')
+  if (visibility) {
+    visibility.addEventListener('click', async () => {
+      const hidden = visibility.getAttribute('aria-pressed') !== 'true'
+      visibility.disabled = true
+      try {
+        await api('PUT', `/api/games/${$('#game').dataset.gameId}`, { hidden })
+        visibility.setAttribute('aria-pressed', String(hidden))
+        visibility.replaceChildren(icon(hidden ? 'eye-off' : 'eye'), hidden ? 'Skjult' : 'Synlig')
+        $('#hidden-notice').hidden = !hidden
+        toast(visibilityText(hidden), 'success')
+      } catch (problem) {
+        toast(problem.message, 'error')
+      } finally {
+        visibility.disabled = false
+      }
+    })
+  }
+
+  // ---------- Innstillinger ----------
+  if ($('#settings')) initSettings()
+
+  function initSettings() {
+    const data = JSON.parse($('#settings-data').textContent)
+    const form = $('#settings-form')
+    const navList = $('#nav-editor')
+    let dirty = false
+    const markDirty = () => { dirty = true }
+
+    $('#site-title').value = data.site_title
+    $('#hero-title').value = data.hero_title
+    $('#hero-text').value = data.hero_text
+    form.addEventListener('input', markDirty)
+    window.addEventListener('beforeunload', (event) => { if (dirty) event.preventDefault() })
+
+    // Logo
+    const logoRemove = $('#logo-remove')
+    function showLogo(url) {
+      $('#logo-preview').replaceChildren(url ? el('img', { src: url, alt: '' }) : icon('gamepad'))
+      $('.brand').firstElementChild.replaceWith(url ? el('img', { class: 'brand-logo', src: url, alt: '' }) : icon('gamepad'))
+      $('link[rel="icon"]').href = url || '/assets/img/favicon.ico'
+      logoRemove.hidden = !url
+    }
+    $('#logo-file').addEventListener('change', async (event) => {
+      const [file] = event.target.files
+      event.target.value = ''
+      if (!file) return
+      try {
+        const result = await api('POST', '/api/settings/logo', file)
+        showLogo(result.logo_url)
+        toast('Logoen er oppdatert.', 'success')
+      } catch (problem) {
+        toast(problem.message, 'error')
+      }
+    })
+    logoRemove.addEventListener('click', async () => {
+      try {
+        await api('DELETE', '/api/settings/logo')
+        showLogo('')
+        toast('Standardikonet brukes igjen.', 'success')
+      } catch (problem) {
+        toast(problem.message, 'error')
+      }
+    })
+
+    // Meny: innebygde sider og egne lenker i valgfri rekkefølge
+    function navRow(item) {
+      const builtin = item.key !== 'link'
+      const info = builtin ? data.builtins[item.key] : null
+      const row = el('li', { class: 'nav-row', dataset: { key: item.key } })
+      const label = el('input', {
+        type: 'text', class: 'nav-label', maxlength: '40', 'aria-label': 'Navn i menyen', placeholder: builtin ? info.label : 'Navn',
+      })
+      label.value = item.label || ''
+      let target
+      const options = el('div', { class: 'nav-options' })
+      if (builtin) {
+        target = el('span', { class: 'nav-target', title: info.href }, info.href)
+        const visible = el('input', { type: 'checkbox', class: 'nav-visible' })
+        visible.checked = !item.hidden
+        row.classList.toggle('is-off', !visible.checked)
+        visible.addEventListener('change', () => row.classList.toggle('is-off', !visible.checked))
+        options.append(el('label', { class: 'nav-check', title: 'Vis siden i menyen' }, visible, 'Vis'))
+      } else {
+        // Ikke type=url: nettleseren avviser da lokale lenker som /side.
+        target = el('input', { type: 'text', inputmode: 'url', class: 'nav-url', maxlength: '2000', placeholder: 'https://… eller /side', 'aria-label': 'Lenke' })
+        target.value = item.url || ''
+        const newTab = el('input', { type: 'checkbox', class: 'nav-new-tab' })
+        newTab.checked = Boolean(item.new_tab)
+        options.append(
+          el('label', { class: 'nav-check', title: 'Åpne lenken i en ny fane' }, newTab, 'Ny fane'),
+          el('button', { type: 'button', class: 'icon-btn danger nav-remove', 'aria-label': 'Fjern lenken', title: 'Fjern lenken' }, icon('trash')),
+        )
+      }
+      const move = el('div', { class: 'nav-move' },
+        el('button', { type: 'button', class: 'icon-btn nav-up', 'aria-label': 'Flytt opp', title: 'Flytt opp' }, icon('chevron-up')),
+        el('button', { type: 'button', class: 'icon-btn nav-down', 'aria-label': 'Flytt ned', title: 'Flytt ned' }, icon('chevron-down')))
+      row.append(el('span', { class: 'nav-icon' }, icon(builtin ? info.icon : 'link')), label, target, options, move)
+      return row
+    }
+    function refreshMoves() {
+      const rows = $$('.nav-row', navList)
+      rows.forEach((row, index) => {
+        $('.nav-up', row).disabled = index === 0
+        $('.nav-down', row).disabled = index === rows.length - 1
+      })
+    }
+    navList.replaceChildren(...data.nav.map(navRow))
+    refreshMoves()
+    navList.addEventListener('click', (event) => {
+      const button = event.target.closest('button')
+      const row = button?.closest('.nav-row')
+      if (!row) return
+      if (button.classList.contains('nav-up') && row.previousElementSibling) row.previousElementSibling.before(row)
+      else if (button.classList.contains('nav-down') && row.nextElementSibling) row.nextElementSibling.after(row)
+      else if (button.classList.contains('nav-remove')) row.remove()
+      else return
+      markDirty()
+      refreshMoves()
+      if (row.isConnected && !button.disabled) button.focus()
+    })
+    $('#nav-add').addEventListener('click', () => {
+      const row = navRow({ key: 'link', label: '', url: '', new_tab: false })
+      navList.append(row)
+      refreshMoves()
+      markDirty()
+      $('.nav-label', row).focus()
+    })
+
+    // Sider
+    $$('.page-editor').forEach((box) => {
+      const page = data.pages[box.dataset.page]
+      const area = $('textarea', box)
+      area.value = page.content
+      $('[data-default]', box).addEventListener('click', () => {
+        const current = area.value.trim()
+        if (current && current !== page.default.trim() && !confirm('Erstatte teksten i feltet med standardteksten?')) return
+        area.value = page.default
+        markDirty()
+      })
+    })
+
+    form.addEventListener('submit', async (event) => {
+      event.preventDefault()
+      const button = $('#settings-save')
+      const body = {
+        site_title: $('#site-title').value,
+        hero_title: $('#hero-title').value,
+        hero_text: $('#hero-text').value,
+        nav: $$('.nav-row', navList).map((row) => (row.dataset.key === 'link'
+          ? { key: 'link', label: $('.nav-label', row).value, url: $('.nav-url', row).value.trim(), new_tab: $('.nav-new-tab', row).checked }
+          : { key: row.dataset.key, label: $('.nav-label', row).value, hidden: !$('.nav-visible', row).checked })),
+      }
+      $$('.page-editor').forEach((box) => { body[`${box.dataset.page}_content`] = $('textarea', box).value })
+      button.disabled = true
+      try {
+        await api('PUT', '/api/settings', body)
+        dirty = false
+        flash('Innstillingene er lagret.', 'success')
+        location.reload()
+      } catch (problem) {
+        toast(problem.message, 'error')
+        button.disabled = false
+      }
+    })
+
+    // Passord
+    const passwordForm = $('#password-form')
+    passwordForm.addEventListener('submit', async (event) => {
+      event.preventDefault()
+      const password = $('#password-new').value
+      if (password !== $('#password-repeat').value) { toast('De nye passordene er ikke like.', 'error'); return }
+      try {
+        await api('POST', '/api/settings/password', { current: $('#password-current')?.value || '', password })
+        flash('Passordet er lagret. Alle andre er logget ut.', 'success')
+        location.reload()
+      } catch (problem) {
+        toast(problem.message, 'error')
+      }
+    })
+    $('#password-remove')?.addEventListener('click', async () => {
+      const current = $('#password-current')
+      if (!current.value) { toast('Skriv inn nåværende passord først.', 'error'); current.focus(); return }
+      const question = passwordForm.dataset.env === 'true'
+        ? 'Fjerne det lagrede passordet og bruke ADMIN_PASSWORD igjen?'
+        : 'Fjerne det lagrede passordet? ADMIN_PASSWORD er ikke satt, så innloggingen blir slått av.'
+      if (!confirm(question)) return
+      try {
+        await api('DELETE', '/api/settings/password', { current: current.value })
+        flash('Det lagrede passordet er fjernet.', 'success')
+        location.reload()
+      } catch (problem) {
+        toast(problem.message, 'error')
       }
     })
   }
@@ -493,7 +716,7 @@
     }
 
     function fileItem(file) {
-      const link = el('a', { class: 'download-btn', href: file.href }, icon('download'), el('span', { class: 'file-name' }, file.name))
+      const link = el('a', { class: 'download-btn', href: file.href }, icon('download'), el('span', { class: 'file-name', title: file.name }, file.name))
       if (file.size_text) link.append(el('span', { class: 'file-size' }, file.size_text))
       const remove = el('button', { type: 'button', class: 'icon-btn danger edit-only file-delete', 'aria-label': `Slett ${file.name}` }, icon('trash'))
       return el('li', { dataset: { fileId: file.id } }, link, remove)

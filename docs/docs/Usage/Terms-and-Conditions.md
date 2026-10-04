@@ -1,7 +1,7 @@
 # Example terms and conditions regarding use of games within classrooms
-An example terms & conditions document (in Norwegian) is included in [`src/templates/terms.html`](https://github.com/sondregronas/EduGameDist/blob/main/src/templates/terms.html).
+An example terms & conditions page (in Norwegian) is included and shown at `/vilkar`. Its default text is defined in [`src/pages.py`](https://github.com/sondregronas/EduGameDist/blob/main/src/pages.py).
 
-Be sure to modify this to fit your needs or requirements.
+Be sure to modify this to fit your needs or requirements. You can rewrite it under **Innstillinger** (Settings) → **Sider** (Pages) in admin; see [Personalization](Personalization.md#pages).
 
 **If there are any issues with this document, please let me know.**
 

@@ -6,6 +6,7 @@ from pathlib import Path
 from urllib.parse import unquote, urlparse
 
 from sqlalchemy import (
+    Boolean,
     ForeignKey,
     Index,
     Integer,
@@ -41,7 +42,10 @@ PLATFORMS = {
     "android": "Android",
     "cover": "Omslagsbilde",
 }
-RESERVED_SLUGS = {"api", "assets", "files", "legacy-covers", "health", "install", "vilkar"}
+RESERVED_SLUGS = {
+    "api", "assets", "files", "legacy-covers", "health", "install", "vilkar",
+    "settings", "login", "logout", "logo",
+}
 LEGACY_PLATFORMS = {
     "windows_download": "windows",
     "mac_download": "mac",
@@ -83,6 +87,7 @@ class Game(Base):
     cover_url: Mapped[str | None] = mapped_column("CoverUrl", Text, default=None)
     steam_app_id: Mapped[str | None] = mapped_column("SteamAppId", String, default=None)
     slug: Mapped[str | None] = mapped_column("Slug", String, default=None)
+    hidden: Mapped[bool] = mapped_column("Hidden", Boolean, default=False, server_default="0")
     categories: Mapped[list["GameCategory"]] = relationship(
         back_populates="game",
         cascade="all, delete-orphan",
@@ -139,6 +144,13 @@ class GameFile(Base):
         default_factory=lambda: datetime.now(timezone.utc),
         server_default=func.current_timestamp(),
     )
+
+
+class Setting(Base):
+    __tablename__ = "settings"
+
+    key: Mapped[str] = mapped_column(String, primary_key=True)
+    value: Mapped[str] = mapped_column(Text, default="")
 
 
 class AppMigration(Base):
@@ -240,7 +252,12 @@ def initialize_db(engine):
         connection.execute(text("PRAGMA journal_mode = WAL"))
         Base.metadata.create_all(connection)
         columns = {column["name"].lower() for column in inspect(connection).get_columns("games")}
-        for column, definition in (("CoverUrl", "TEXT"), ("SteamAppId", "TEXT"), ("Slug", "TEXT")):
+        for column, definition in (
+            ("CoverUrl", "TEXT"),
+            ("SteamAppId", "TEXT"),
+            ("Slug", "TEXT"),
+            ("Hidden", "BOOLEAN NOT NULL DEFAULT 0"),
+        ):
             if column.lower() not in columns:
                 connection.execute(text(f'ALTER TABLE games ADD COLUMN "{column}" {definition}'))
 
@@ -397,22 +414,21 @@ def get_game(session, game_id):
         "browser_url": _public_url(game.browser_url, allow_local=True),
         "steam_app_id": game.steam_app_id or "",
         "slug": game.slug,
+        "hidden": bool(game.hidden),
         "files": files,
         "platforms": _platforms(game.browser_url, files),
     }
 
 
-def list_games(session):
+def list_games(session, include_hidden=True):
     ordering = case(
         (Game.title.like("The %"), func.substr(Game.title, 5)),
         else_=Game.title,
     ).collate("NOCASE")
-    return [
-        {
-            **get_game(session, game.id),
-        }
-        for game in session.scalars(select(Game).order_by(ordering))
-    ]
+    query = select(Game).order_by(ordering)
+    if not include_hidden:
+        query = query.where(Game.hidden.is_(False))
+    return [get_game(session, game.id) for game in session.scalars(query)]
 
 
 def unique_slug(session, title, exclude_id=None):

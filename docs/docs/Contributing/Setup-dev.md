@@ -1,27 +1,27 @@
-# Utviklingsmiljø
+# Development setup
 
-Installer Python 3.10 eller nyere og [uv](https://docs.astral.sh/uv/), klon prosjektet og kjør kommandoen som passer skallet ditt fra prosjektroten:
+Install Python 3.10 or newer and [uv](https://docs.astral.sh/uv/), clone the project and run the command for your shell from the project root:
 
 ```powershell
 uv sync; if ($?) { uv run --directory src python dev.py }
 ```
 
-For bash eller zsh:
+For bash or zsh:
 
 ```bash
 uv sync && uv run --directory src python dev.py
 ```
 
-Begge kommandoene starter appene med `FLASK_DEBUG=1` (live-reload og debugger):
+Both commands start the apps with `FLASK_DEBUG=1` (live reload and debugger):
 
-| App | Adresse |
+| App | Address |
 | --- | --- |
 | Admin | <http://localhost:8081> |
-| Offentlig side | <http://localhost:8080> |
+| Public site | <http://localhost:8080> |
 
-Avslutt begge med `Ctrl+C`. Python-filer og maler lastes inn på nytt automatisk; CSS og JavaScript leses fra disk, så det holder å laste siden på nytt.
+Stop both with `Ctrl+C`. Python files and templates are reloaded automatically; CSS and JavaScript are read from disk, so reloading the page is enough.
 
-Databasen og opplastede filer ligger i `src/data` (kan endres med `DATA_DIR`). Sett `ADMIN_PASSWORD` først hvis du vil teste innloggingen:
+The database, covers and logo are stored in `src/data` (change it with `DATA_DIR`), and uploaded game files in `src/data/games/<Platform>/<game>/` (change it with `GAMES_DIR`). Set `ADMIN_PASSWORD` first if you want to test the login:
 
 ```powershell
 $env:ADMIN_PASSWORD = "test"; uv sync; if ($?) { uv run --directory src python dev.py }
@@ -31,6 +31,6 @@ $env:ADMIN_PASSWORD = "test"; uv sync; if ($?) { uv run --directory src python d
 ADMIN_PASSWORD=test uv sync && ADMIN_PASSWORD=test uv run --directory src python dev.py
 ```
 
-Porter kan endres med `ADMIN_PORT` og `PUBLIC_PORT`. Kjør testene med `uv run --directory src python -m unittest discover -s tests`.
+The ports can be changed with `ADMIN_PORT` and `PUBLIC_PORT`. Run the tests with `uv run --directory src python -m unittest discover -s tests`.
 
-> Debug-modus tillater kjøring av kode gjennom feilsiden og skal aldri brukes ved utrulling.
+> Debug mode allows running code through the error page and must never be used in production.

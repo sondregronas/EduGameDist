@@ -5,12 +5,14 @@ import json
 import mimetypes
 import os
 import re
+import shutil
 import socket
 import sys
 import time
 import uuid
 import zlib
-from pathlib import Path
+from contextlib import contextmanager
+from pathlib import Path, PurePosixPath
 from urllib.error import HTTPError, URLError
 from urllib.parse import unquote, urljoin, urlparse
 from urllib.request import HTTPRedirectHandler, Request, build_opener
@@ -46,8 +48,10 @@ from database import (
     make_engine,
     unique_slug,
 )
-from auth import configure_auth
-from richtext import rich_text
+import settings
+from auth import auth_enabled, configure_auth, logged_in, password_status
+from pages import PAGES
+from richtext import page_sections, rich_text
 from stores import FetchError, discover_store_links, steam_search, store_catalog, store_info
 
 
@@ -57,17 +61,20 @@ USER_AGENT = "EduGameDist/2.0"
 UPLOAD_READ_SIZE = 8 * 1024 * 1024
 MAX_JSON_BYTES = 5 * 1024 * 1024
 MAX_COVER_BYTES = 25 * 1024 * 1024
+MAX_LOGO_BYTES = 2 * 1024 * 1024
 STALE_TEMP_SECONDS = 24 * 60 * 60
 COVER_EXTENSIONS = {".jpg", ".jpeg", ".png", ".webp", ".gif"}
 IMAGE_TYPES = {"image/jpeg": ".jpg", "image/png": ".png", "image/webp": ".webp", "image/gif": ".gif"}
 FILE_PLATFORMS = ("windows", "mac", "linux", "android")
 UPLOAD_PLATFORMS = FILE_PLATFORMS + ("cover",)
-LEGACY_DIRS = {
+# Game files are stored as <GAMES_DIR>/<folder>/<slug>/<file name>.
+PLATFORM_DIRS = {
     "windows": "Windows",
     "mac": "Mac",
     "linux": "Linux",
     "android": "Android",
 }
+WINDOWS_RESERVED_NAMES = {"CON", "PRN", "AUX", "NUL", *(f"COM{n}" for n in range(1, 10)), *(f"LPT{n}" for n in range(1, 10))}
 TEXT_FIELDS = {
     "description": ("Beskrivelsen", 200_000),
     "note": ("Lærernotatet", 200_000),
@@ -84,6 +91,10 @@ URL_FIELDS = {
 
 def _data_dir(value=None):
     return Path(value or os.environ.get("DATA_DIR", ROOT / "data")).resolve()
+
+
+def _games_dir(value=None):
+    return Path(value or os.environ.get("GAMES_DIR", PUBLIC_DIR / "games")).resolve()
 
 
 class _NoRedirect(HTTPRedirectHandler):
@@ -163,14 +174,190 @@ def _human_size(size):
 
 
 def _stored_path(stored_name):
+    """Where a file lives: games/<Folder>/<slug>/<name> in the game folder, legacy/<platform>/<name> for
+    files placed there by hand in older versions, and anything else (covers) in the upload folder."""
     if not stored_name:
         return None
-    if stored_name.startswith("legacy/"):
-        parts = Path(stored_name).parts
-        if len(parts) != 3 or parts[1] not in LEGACY_DIRS:
+    parts = PurePosixPath(stored_name).parts
+    games = Path(current_app.config["GAMES_DIR"])
+    if parts[0] == "games":
+        if len(parts) != 4 or parts[1] not in PLATFORM_DIRS.values() or ".." in parts:
             return None
-        return PUBLIC_DIR / "games" / LEGACY_DIRS[parts[1]] / parts[2]
+        return games.joinpath(*parts[1:])
+    if parts[0] == "legacy":
+        if len(parts) != 3 or parts[1] not in PLATFORM_DIRS or parts[2] == "..":
+            return None
+        return games / PLATFORM_DIRS[parts[1]] / parts[2]
     return Path(current_app.config["UPLOAD_DIR"]) / Path(stored_name).name
+
+
+def _games_folder(platform):
+    """The folder for a platform's game files, or None if files written there would be lost when the
+    container is replaced (the Docker image requires the folder to be a mounted volume)."""
+    folder = Path(current_app.config["GAMES_DIR"]) / PLATFORM_DIRS[platform]
+    if current_app.config["GAMES_MOUNT_REQUIRED"] and not (os.path.ismount(folder.parent) or os.path.ismount(folder)):
+        return None
+    return folder
+
+
+def _games_name(path):
+    return "games/" + path.relative_to(current_app.config["GAMES_DIR"]).as_posix()
+
+
+def _safe_filename(name, limit=200):
+    """A file name that works on Linux and Windows and leaves room for a " (2)" suffix."""
+    name = re.sub(r'[\x00-\x1f\x7f<>:"/\\|?*]', "_", name).strip(" .")
+    stem, suffix = os.path.splitext(name)
+    if len(suffix.encode("utf-8")) > 20:
+        stem, suffix = stem + suffix, ""
+    if stem.upper() in WINDOWS_RESERVED_NAMES:
+        stem = "_" + stem
+    if len((stem + suffix).encode("utf-8")) > limit:
+        while len((stem + suffix).encode("utf-8")) > limit:
+            stem = stem[:-1]
+        stem = stem.rstrip(" .")
+    return (stem or "fil") + suffix
+
+
+def _name_variants(name):
+    stem, suffix = os.path.splitext(name)
+    yield name
+    for number in range(2, 1000):
+        yield f"{stem} ({number}){suffix}"
+
+
+def _move_exclusive(source, target):
+    """Move `source` to `target`, raising FileExistsError instead of overwriting another file."""
+    os.close(os.open(target, os.O_WRONLY | os.O_CREAT | os.O_EXCL))
+    try:
+        os.replace(source, target)
+    except BaseException:
+        target.unlink(missing_ok=True)
+        raise
+
+
+def _first_free(directory, name, place):
+    for candidate in _name_variants(name):
+        target = directory / candidate
+        try:
+            place(target)
+            return target
+        except FileExistsError:
+            continue
+    raise FileExistsError(errno.EEXIST, "No free file name", str(directory / name))
+
+
+def _place_file(source, directory, name, keep_source=False):
+    """Move `source` into `directory` under the first free variant of `name` and return the new path.
+
+    Across filesystems (and with keep_source) the file is copied instead and the source is left in
+    place, so the caller can delete it once the database points at the new path."""
+    directory.mkdir(parents=True, exist_ok=True)
+    if not keep_source:
+        try:
+            return _first_free(directory, name, lambda target: _move_exclusive(source, target))
+        except OSError as error:
+            if error.errno != errno.EXDEV:
+                raise
+    staged = directory / f".{uuid.uuid4().hex}.part"
+    try:
+        shutil.copyfile(source, staged)
+        return _first_free(directory, name, lambda target: _move_exclusive(staged, target))
+    finally:
+        staged.unlink(missing_ok=True)
+
+
+def _remove_if_empty(directory):
+    """Remove a game's folder (<GAMES_DIR>/<Folder>/<slug>) once its last file is gone."""
+    if directory.parent.parent != Path(current_app.config["GAMES_DIR"]):
+        return
+    try:
+        directory.rmdir()
+    except OSError:
+        pass
+
+
+def _relocate_game_files(session, game):
+    """Move a game's files into <GAMES_DIR>/<Folder>/<slug>/: after a rename, and for files stored by
+    older versions (random names in the upload folder, or loose files in the platform folder)."""
+    moved = 0
+    items = session.scalars(
+        select(GameFile).where(
+            GameFile.game_id == game.id,
+            GameFile.platform.in_(FILE_PLATFORMS),
+            GameFile.stored_name.is_not(None),
+        )
+    ).all()
+    for item in items:
+        folder = _games_folder(item.platform)
+        source = _stored_path(item.stored_name)
+        if not folder or not source or source.parent == folder / game.slug or not source.is_file():
+            continue
+        old_name = item.stored_name
+        name = source.name if old_name.startswith(("games/", "legacy/")) else _safe_filename(item.original_name)
+        # A hand-placed legacy file can belong to several games; each of them gets its own copy.
+        shared = session.scalar(
+            select(GameFile.id).where(GameFile.stored_name == old_name, GameFile.id != item.id).limit(1)
+        ) is not None
+        try:
+            target = _place_file(source, folder / game.slug, name, keep_source=shared)
+        except OSError as error:
+            current_app.logger.warning("Could not move %s into %s: %s", source, folder / game.slug, error)
+            continue
+        item.stored_name = _games_name(target)
+        try:
+            session.commit()
+        except SQLAlchemyError:
+            session.rollback()
+            if source.exists():
+                target.unlink(missing_ok=True)
+            else:
+                os.replace(target, source)
+            raise
+        if not shared:
+            source.unlink(missing_ok=True)
+            if old_name.startswith("games/"):
+                _remove_if_empty(source.parent)
+        moved += 1
+    return moved
+
+
+@contextmanager
+def _exclusive_lock(path):
+    """Let one worker process at a time move files. A no-op where fcntl is missing (Windows)."""
+    try:
+        import fcntl
+    except ImportError:
+        yield
+        return
+    with open(path, "a") as handle:
+        fcntl.flock(handle, fcntl.LOCK_EX)
+        try:
+            yield
+        finally:
+            fcntl.flock(handle, fcntl.LOCK_UN)
+
+
+def _migrate_game_files(app):
+    with app.app_context():
+        unavailable = [PLATFORM_DIRS[platform] for platform in FILE_PLATFORMS if not _games_folder(platform)]
+        if unavailable:
+            app.logger.warning(
+                "%s is not a mounted volume, so new %s files are kept in %s. Mount ./games at %s "
+                "in docker-compose.yml to store them as <Platform>/<game>/<file>.",
+                app.config["GAMES_DIR"], ", ".join(unavailable), app.config["UPLOAD_DIR"], app.config["GAMES_DIR"],
+            )
+        with _exclusive_lock(Path(app.config["DATA_DIR"]) / ".file-migration.lock"), \
+                Session(app.extensions["database_engine"]) as session:
+            game_ids = session.scalars(
+                select(GameFile.game_id)
+                .where(GameFile.platform.in_(FILE_PLATFORMS), GameFile.stored_name.is_not(None))
+                .distinct()
+            ).all()
+            games = [session.get(Game, game_id) for game_id in game_ids]
+            moved = sum(_relocate_game_files(session, game) for game in games if game)
+        if moved:
+            print(f"Moved {moved} game file(s) into per-game folders in {app.config['GAMES_DIR']}.", flush=True)
 
 
 def _decorate_files(game):
@@ -190,16 +377,20 @@ def _file_view(item):
     return {key: value for key, value in item.items() if key != "stored_name"}
 
 
-def _open_app(mode, data_dir=None):
+def _open_app(mode, data_dir=None, games_dir=None):
     data = _data_dir(data_dir)
     data.mkdir(parents=True, exist_ok=True)
     app = Flask(__name__, template_folder=str(ROOT / "templates"), static_folder=None)
     app.config.update(
         APP_MODE=mode,
+        DATA_DIR=str(data),
         DATABASE_PATH=str(data / "gamedb.db"),
         UPLOAD_DIR=str(data / "uploads"),
         TEMP_DIR=str(data / "upload-tmp"),
         LEGACY_COVER_DIR=str(data / "legacy-covers"),
+        SITE_DIR=str(data / "site"),
+        GAMES_DIR=str(_games_dir(games_dir)),
+        GAMES_MOUNT_REQUIRED=os.environ.get("GAMES_MOUNT_REQUIRED", "").lower() in ("1", "true", "yes"),
         TITLE=os.environ.get("TITLE", "Spilldistribusjon"),
         PUBLIC_URL=os.environ.get("PUBLIC_URL", "http://localhost/"),
     )
@@ -212,6 +403,10 @@ def _open_app(mode, data_dir=None):
     Path(app.config["UPLOAD_DIR"]).mkdir(parents=True, exist_ok=True)
     if mode == "admin":
         _cleanup_temp_files(Path(app.config["TEMP_DIR"]))
+        for folder in PLATFORM_DIRS.values():
+            temp_dir = Path(app.config["GAMES_DIR"]) / folder / ".upload-tmp"
+            if temp_dir.is_dir():
+                _cleanup_temp_files(temp_dir)
 
     @app.before_request
     def open_database():
@@ -234,14 +429,39 @@ def _open_app(mode, data_dir=None):
     def template_context():
         return {
             "admin": mode == "admin",
-            "site_title": current_app.config["TITLE"],
+            "site": settings.site(),
             "public_url": current_app.config["PUBLIC_URL"],
-            "auth_enabled": bool(current_app.config.get("ADMIN_PASSWORD")),
+            "auth_enabled": mode == "admin" and auth_enabled(),
+            "logged_in": mode == "admin" and logged_in(),
         }
 
     @app.get("/assets/<path:asset>")
     def assets(asset):
+        # Game files live under public/games in the Docker image; they are only served through
+        # /<slug>/files/<id>, which hides files of hidden games.
+        if PurePosixPath(asset).parts[0].lower() == "games":
+            abort(404)
         return send_from_directory(PUBLIC_DIR, asset)
+
+    @app.get("/favicon.ico")
+    def favicon():
+        logo = settings.site()["logo"]
+        if logo:
+            return redirect(f"/logo/{logo}")
+        return send_from_directory(PUBLIC_DIR / "img", "favicon.ico", max_age=86400)
+
+    @app.get("/logo/<name>")
+    def site_logo(name):
+        path = Path(current_app.config["SITE_DIR"]) / name
+        if name != settings.site()["logo"] or Path(name).name != name or not path.is_file():
+            abort(404)
+        response = send_file(
+            path,
+            mimetype=mimetypes.guess_type(name)[0] or "application/octet-stream",
+            max_age=365 * 24 * 60 * 60,
+        )
+        response.headers["X-Content-Type-Options"] = "nosniff"
+        return response
 
     @app.get("/legacy-covers/<path:filename>")
     def legacy_cover(filename):
@@ -267,7 +487,7 @@ def _open_app(mode, data_dir=None):
     def get_file(slug, file_id):
         item = g.db.get(GameFile, file_id)
         game = item and g.db.get(Game, item.game_id)
-        if not item or not item.stored_name or not game or game.slug != slug:
+        if not item or not item.stored_name or not game or game.slug != slug or (game.hidden and mode == "public"):
             abort(404)
         path = _stored_path(item.stored_name)
         if not path or not path.is_file():
@@ -291,25 +511,45 @@ def _open_app(mode, data_dir=None):
 
     @app.get("/")
     def index():
-        games = list_games(g.db)
+        games = list_games(g.db, include_hidden=mode == "admin")
+        categories = {}
+        for game in games:
+            for name in game["category"]:
+                categories.setdefault(name.lower(), [name, 0])[1] += 1
+        present = {platform for game in games for platform in game["platforms"]}
         return render_template(
             "index.html",
-            title=current_app.config["TITLE"],
             games=games,
+            categories=sorted(categories.values(), key=lambda entry: entry[0].lower()),
+            platforms=[(key, label) for key, label in PLATFORMS.items() if key in present],
             remote_covers=sum(1 for game in games if _is_remote(game["cover"])) if mode == "admin" else 0,
+            storage_warning=mode == "admin" and any(_games_folder(platform) is None for platform in FILE_PLATFORMS),
+        )
+
+    def editable_page(name):
+        page = PAGES[name]
+        return render_template(
+            "page.html",
+            title=page["title"],
+            page=page_sections(settings.page_content(name)),
+            page_name=name,
+            default_icon=page["icon"],
         )
 
     @app.get("/install")
     def installation_guide():
-        return render_template("install.html", title="Installasjon")
+        return editable_page("install")
 
     @app.get("/vilkar")
     def terms():
-        return render_template("terms.html", title="Vilkår og betingelser")
+        return editable_page("terms")
 
     @app.get("/<slug>")
     def game_page(slug):
-        game_id = g.db.scalar(select(Game.id).where(Game.slug == slug))
+        query = select(Game.id).where(Game.slug == slug)
+        if mode == "public":
+            query = query.where(Game.hidden.is_(False))
+        game_id = g.db.scalar(query)
         if not game_id:
             abort(404)
         game = _decorate_files(get_game(g.db, game_id))
@@ -329,15 +569,16 @@ def _open_app(mode, data_dir=None):
 
     if mode == "admin":
         _configure_admin(app)
+        _migrate_game_files(app)
     return app
 
 
-def create_public_app(data_dir=None):
-    return _open_app("public", data_dir)
+def create_public_app(data_dir=None, games_dir=None):
+    return _open_app("public", data_dir, games_dir)
 
 
-def create_admin_app(data_dir=None):
-    return _open_app("admin", data_dir)
+def create_admin_app(data_dir=None, games_dir=None):
+    return _open_app("admin", data_dir, games_dir)
 
 
 def _cleanup_temp_files(directory):
@@ -373,6 +614,7 @@ def _client_game(game):
         "cover_url": "" if cover.startswith("data:") else cover,
         "categories": game["category"],
         "links": game["links"],
+        "hidden": game["hidden"],
         "files": [_file_view(item) for item in game["files"]],
     }
 
@@ -407,6 +649,58 @@ def _configure_admin(app):
             return jsonify(error="Forespørselen er for stor."), 413
         return None
 
+    @app.get("/settings")
+    def settings_page():
+        return render_template(
+            "settings.html",
+            title="Innstillinger",
+            data=settings.editor_data(),
+            pages=PAGES,
+            default_title=current_app.config["TITLE"],
+            password=password_status(),
+        )
+
+    @app.put("/api/settings")
+    def update_settings():
+        try:
+            values = settings.validate(request.get_json(silent=True) or {})
+        except ValueError as error:
+            return jsonify(error=str(error)), 400
+        settings.put(values)
+        return jsonify(status="saved")
+
+    @app.post("/api/settings/logo")
+    def upload_logo():
+        declared = request.content_length
+        if not declared:
+            return jsonify(error="Filen er tom."), 400
+        if declared > MAX_LOGO_BYTES:
+            return jsonify(error="Logoen er for stor (maks 2 MB)."), 413
+        data = request.get_data(cache=False)
+        extension = _sniff_image(data) or (".ico" if data.startswith(b"\x00\x00\x01\x00") else None)
+        if not extension:
+            return jsonify(error="Logoen må være et PNG-, JPEG-, WebP-, GIF- eller ICO-bilde."), 400
+        directory = Path(current_app.config["SITE_DIR"])
+        name = f"logo-{uuid.uuid4().hex[:12]}{extension}"
+        try:
+            directory.mkdir(parents=True, exist_ok=True)
+            (directory / name).write_bytes(data)
+        except OSError:
+            return jsonify(error="Kunne ikke lagre logoen på tjeneren."), 500
+        old = settings.get("logo")
+        settings.put({"logo": name})
+        g.db.commit()
+        _remove_logo(old)
+        return jsonify(logo_url=f"/logo/{name}")
+
+    @app.delete("/api/settings/logo")
+    def delete_logo():
+        old = settings.get("logo")
+        settings.put({"logo": None})
+        g.db.commit()
+        _remove_logo(old)
+        return jsonify(logo_url="")
+
     @app.get("/api/games")
     def admin_games():
         return jsonify([_client_game(_decorate_files(game)) for game in list_games(g.db)])
@@ -437,9 +731,13 @@ def _configure_admin(app):
         values = _validated_game_values(request.get_json(silent=True) or {})
         if isinstance(values, tuple):
             return values
+        old_slug = game.slug
         if "title" in values and values["title"] != game.title:
             game.slug = unique_slug(g.db, values["title"], exclude_id=game_id)
         warning = _apply_values(game, values)
+        if game.slug != old_slug:
+            g.db.commit()
+            _relocate_game_files(g.db, game)
         return jsonify(id=game_id, slug=game.slug, warning=warning)
 
     @app.delete("/api/games/<int:game_id>")
@@ -544,14 +842,14 @@ def _configure_admin(app):
         if platform == "cover" and declared > MAX_COVER_BYTES:
             return jsonify(error="Omslagsbildet er for stort (maks 25 MB)."), 413
 
-        temp_dir = Path(current_app.config["TEMP_DIR"])
-        temp_dir.mkdir(parents=True, exist_ok=True)
+        # Game files go to <GAMES_DIR>/<Platform>/<slug>/ under their own name. Covers (and game files when
+        # the game folder is not a mounted volume) get a random name in the upload folder.
+        folder = _games_folder(platform) if platform != "cover" else None
+        temp_dir = folder / ".upload-tmp" if folder else Path(current_app.config["TEMP_DIR"])
         temp_path = temp_dir / f"{uuid.uuid4().hex}.part"
-        suffix = Path(file_name).suffix.lower()
-        stored_name = uuid.uuid4().hex + (suffix if re.fullmatch(r"\.[a-z0-9]{1,10}", suffix) else "")
-        final_path = Path(current_app.config["UPLOAD_DIR"]) / stored_name
         received = 0
         try:
+            temp_dir.mkdir(parents=True, exist_ok=True)
             with temp_path.open("wb") as stream:
                 while True:
                     block = request.stream.read(UPLOAD_READ_SIZE)
@@ -564,7 +862,15 @@ def _configure_admin(app):
             if received != declared:
                 temp_path.unlink(missing_ok=True)
                 return jsonify(error="Opplastingen ble avbrutt før hele filen var mottatt."), 400
-            os.replace(temp_path, final_path)
+            if folder:
+                final_path = _place_file(temp_path, folder / game.slug, _safe_filename(file_name))
+                stored_name = _games_name(final_path)
+            else:
+                suffix = Path(file_name).suffix.lower()
+                stored_name = uuid.uuid4().hex + (suffix if re.fullmatch(r"\.[a-z0-9]{1,10}", suffix) else "")
+                final_path = Path(current_app.config["UPLOAD_DIR"]) / stored_name
+                final_path.parent.mkdir(parents=True, exist_ok=True)
+                os.replace(temp_path, final_path)
         except OSError as error:
             temp_path.unlink(missing_ok=True)
             if error.errno == errno.ENOSPC:
@@ -582,7 +888,7 @@ def _configure_admin(app):
                 _replace_cover(game, item)
             g.db.commit()
         except SQLAlchemyError:
-            final_path.unlink(missing_ok=True)
+            _delete_uploaded_file(stored_name)
             raise
         return jsonify(
             id=item.id,
@@ -613,10 +919,20 @@ def _configure_admin(app):
 
 
 def _delete_uploaded_file(stored_name):
+    # Files that older versions expected to be managed by hand are left alone.
     if not stored_name or stored_name.startswith("legacy/"):
         return
-    path = Path(current_app.config["UPLOAD_DIR"]) / Path(stored_name).name
+    path = _stored_path(stored_name)
+    if not path:
+        return
     path.unlink(missing_ok=True)
+    if stored_name.startswith("games/"):
+        _remove_if_empty(path.parent)
+
+
+def _remove_logo(name):
+    if name and Path(name).name == name:
+        (Path(current_app.config["SITE_DIR"]) / name).unlink(missing_ok=True)
 
 
 def _replace_cover(game, item):
@@ -690,7 +1006,7 @@ def _canonical_cover_url(value):
 
 
 def _apply_values(game, values):
-    for key in ("title", "description", "note", "time", "players", "developer", "developer_link", "browser_url", "steam_app_id", "cover_url"):
+    for key in ("title", "description", "note", "time", "players", "developer", "developer_link", "browser_url", "steam_app_id", "cover_url", "hidden"):
         if key in values:
             value = values[key]
             if key == "cover_url" and isinstance(value, str):
@@ -747,6 +1063,10 @@ def _validated_game_values(body, creating=False):
             if value and (not value.isascii() or not value.isdigit() or len(value) > 20):
                 raise ValueError("Steam-app-ID må bare inneholde sifre.")
             values["steam_app_id"] = value
+        if "hidden" in body:
+            if not isinstance(body["hidden"], bool):
+                raise ValueError("Synlighet må være true eller false.")
+            values["hidden"] = body["hidden"]
         if "categories" in body:
             categories = _split_values(body.get("categories"))
             if len(categories) > 30 or any(len(name) > 100 for name in categories):
@@ -816,7 +1136,7 @@ def _steam_app_id(value):
 
 if __name__ == "__main__":
     if len(sys.argv) != 2 or sys.argv[1] not in ("public", "admin"):
-        raise SystemExit("Bruk: python app.py public|admin")
+        raise SystemExit("Usage: python app.py public|admin")
     app = create_public_app() if sys.argv[1] == "public" else create_admin_app()
     default_port = "80" if sys.argv[1] == "public" else "8081"
     # Debug (live reload and the interactive debugger) is only for local development.

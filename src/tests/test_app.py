@@ -24,9 +24,12 @@ from database import (
     GameCategory,
     GameFile,
     GameStoreLink,
+    Setting,
     initialize_db,
     make_engine,
 )
+
+PNG = b"\x89PNG\r\n\x1a\n fake png"
 
 
 def fake_fetch(routes):
@@ -42,9 +45,10 @@ def fake_fetch(routes):
 class EduGameDistAppTests(unittest.TestCase):
     def setUp(self):
         self.temp_dir = tempfile.TemporaryDirectory()
-        data_dir = Path(self.temp_dir.name) / "missing" / "data"
-        self.admin = create_admin_app(data_dir)
-        self.public = create_public_app(data_dir)
+        self.data_dir = Path(self.temp_dir.name) / "missing" / "data"
+        self.games_dir = Path(self.temp_dir.name) / "games"
+        self.admin = create_admin_app(self.data_dir, self.games_dir)
+        self.public = create_public_app(self.data_dir, self.games_dir)
         self.engines = [
             self.admin.extensions["database_engine"],
             self.public.extensions["database_engine"],
@@ -377,6 +381,234 @@ class EduGameDistAppTests(unittest.TestCase):
         self.assertEqual(app_module._human_size(999), "999 B")
         self.assertEqual(app_module._human_size(1_500_000), "1,5 MB")
         self.assertEqual(app_module._human_size(21_474_836_480), "21,5 GB")
+
+    def test_game_files_are_stored_in_per_game_folders_under_their_own_name(self):
+        game_id, slug = self.create_game()
+        first = self.upload(game_id, b"one", "Setup.zip")
+        second = self.upload(game_id, b"two", "Setup.zip")
+        odd = self.upload(game_id, b"three", 'bad:name?.zip', platform="mac")
+        folder = self.games_dir / "Windows" / slug
+        self.assertEqual((folder / "Setup.zip").read_bytes(), b"one")
+        self.assertEqual((folder / "Setup (2).zip").read_bytes(), b"two")
+        self.assertEqual((self.games_dir / "Mac" / slug / "bad_name_.zip").read_bytes(), b"three")
+        download = self.public_client.get(odd.json["href"])
+        self.assertEqual(download.data, b"three")
+        self.assertIn("bad:name?.zip", download.headers["Content-Disposition"])
+        download.close()
+        with self.public_client.get(second.json["href"]) as response:
+            self.assertEqual(response.data, b"two")
+        self.assertEqual(first.json["name"], "Setup.zip")
+        self.assertEqual(list(Path(self.admin.config["UPLOAD_DIR"]).iterdir()), [])
+        self.assertEqual(list((self.games_dir / "Windows" / ".upload-tmp").iterdir()), [])
+
+    def test_safe_filename_handles_unsafe_and_long_names(self):
+        self.assertEqual(app_module._safe_filename("../../etc/passwd"), "_.._etc_passwd")
+        self.assertEqual(app_module._safe_filename(" ..hidden.zip. "), "hidden.zip")
+        self.assertEqual(app_module._safe_filename("CON.zip"), "_CON.zip")
+        self.assertEqual(app_module._safe_filename("..."), "fil")
+        long_name = app_module._safe_filename("æ" * 300 + ".zip")
+        self.assertTrue(long_name.endswith(".zip"))
+        self.assertLessEqual(len(long_name.encode("utf-8")), 200)
+
+    def test_renaming_a_game_moves_its_files_to_the_new_folder(self):
+        game_id, slug = self.create_game()
+        upload = self.upload(game_id, b"zip", "game.zip")
+        self.upload(game_id, b"apk", "game.apk", platform="android")
+        response = self.admin_client.put(f"/api/games/{game_id}", json={"title": "Renamed Game"})
+        new_slug = response.json["slug"]
+        self.assertNotEqual(slug, new_slug)
+        self.assertTrue((self.games_dir / "Windows" / new_slug / "game.zip").is_file())
+        self.assertTrue((self.games_dir / "Android" / new_slug / "game.apk").is_file())
+        self.assertFalse((self.games_dir / "Windows" / slug).exists())
+        self.assertFalse((self.games_dir / "Android" / slug).exists())
+        with self.public_client.get(f"/{new_slug}/files/{upload.json['id']}") as download:
+            self.assertEqual(download.data, b"zip")
+
+    def test_deleting_files_and_games_removes_their_folders(self):
+        game_id, slug = self.create_game()
+        upload = self.upload(game_id, b"zip", "game.zip")
+        self.upload(game_id, b"dmg", "game.dmg", platform="mac")
+        self.assertEqual(self.admin_client.delete(f"/api/files/{upload.json['id']}").status_code, 200)
+        self.assertFalse((self.games_dir / "Windows" / slug).exists())
+        self.assertTrue((self.games_dir / "Mac" / slug / "game.dmg").is_file())
+        self.assertEqual(self.admin_client.delete(f"/api/games/{game_id}").status_code, 200)
+        self.assertFalse((self.games_dir / "Mac" / slug).exists())
+
+    def test_existing_uploads_are_moved_into_game_folders_on_startup(self):
+        game_id, slug = self.create_game()
+        other_id, other_slug = self.create_game(title="Other Game")
+        cover = self.upload(game_id, PNG, "cover.png", platform="cover")
+        upload_dir = Path(self.admin.config["UPLOAD_DIR"])
+        (upload_dir / "0123abcd.zip").write_bytes(b"old upload")
+        loose = self.games_dir / "Windows" / "manual.zip"
+        loose.parent.mkdir(parents=True, exist_ok=True)
+        loose.write_bytes(b"manual")
+        with Session(self.admin.extensions["database_engine"]) as session:
+            session.add_all([
+                GameFile(game_id=game_id, platform="linux", original_name="Linux build.zip", stored_name="0123abcd.zip"),
+                GameFile(game_id=game_id, platform="windows", original_name="manual.zip", stored_name="legacy/windows/manual.zip"),
+                GameFile(game_id=other_id, platform="windows", original_name="manual.zip", stored_name="legacy/windows/manual.zip"),
+                GameFile(game_id=other_id, platform="mac", original_name="gone.zip", stored_name="legacy/mac/gone.zip"),
+            ])
+            session.commit()
+        for engine in self.engines:
+            engine.dispose()
+
+        restarted = create_admin_app(self.data_dir, self.games_dir)
+        self.engines.append(restarted.extensions["database_engine"])
+        self.assertEqual((self.games_dir / "Linux" / slug / "Linux build.zip").read_bytes(), b"old upload")
+        self.assertEqual((self.games_dir / "Windows" / slug / "manual.zip").read_bytes(), b"manual")
+        self.assertEqual((self.games_dir / "Windows" / other_slug / "manual.zip").read_bytes(), b"manual")
+        self.assertFalse(loose.exists())
+        self.assertFalse((upload_dir / "0123abcd.zip").exists())
+        with Session(restarted.extensions["database_engine"]) as session:
+            names = {item.original_name + ":" + str(item.game_id): item.stored_name for item in session.scalars(select(GameFile))}
+        self.assertEqual(names[f"Linux build.zip:{game_id}"], f"games/Linux/{slug}/Linux build.zip")
+        self.assertEqual(names[f"manual.zip:{other_id}"], f"games/Windows/{other_slug}/manual.zip")
+        self.assertEqual(names[f"gone.zip:{other_id}"], "legacy/mac/gone.zip")
+        self.assertNotIn("/", names[f"cover.png:{game_id}"])
+        with restarted.test_client().get(f"/{slug}/files/{cover.json['id']}") as response:
+            self.assertEqual(response.data, PNG)
+
+    def test_uploads_stay_in_the_data_volume_when_the_games_folder_is_not_mounted(self):
+        self.admin.config["GAMES_MOUNT_REQUIRED"] = True
+        game_id, slug = self.create_game()
+        upload = self.upload(game_id, b"zip", "game.zip")
+        self.assertEqual(upload.status_code, 201)
+        self.assertFalse((self.games_dir / "Windows").exists())
+        self.assertEqual(len(list(Path(self.admin.config["UPLOAD_DIR"]).iterdir())), 1)
+        with self.public_client.get(upload.json["href"]) as download:
+            self.assertEqual(download.data, b"zip")
+        self.assertIn("notice-warn", self.admin_client.get("/").get_data(as_text=True))
+
+        mounted = lambda path: Path(path) == self.games_dir
+        with patch("app.os.path.ismount", side_effect=mounted):
+            self.assertEqual(self.upload(game_id, b"zip", "mounted.zip").status_code, 201)
+            self.assertNotIn("notice-warn", self.admin_client.get("/").get_data(as_text=True))
+        self.assertTrue((self.games_dir / "Windows" / slug / "mounted.zip").is_file())
+
+    def test_hidden_games_are_only_shown_in_admin(self):
+        game_id, slug = self.create_game()
+        upload = self.upload(game_id, b"zip", "game.zip")
+        self.assertEqual(self.admin_client.put(f"/api/games/{game_id}", json={"hidden": "yes"}).status_code, 400)
+        self.assertEqual(self.admin_client.put(f"/api/games/{game_id}", json={"hidden": True}).status_code, 200)
+        self.assertTrue(self.admin_client.get(f"/api/games/{game_id}").json["hidden"])
+        self.assertNotIn(b"Test Game", self.public_client.get("/").data)
+        self.assertEqual(self.public_client.get(f"/{slug}").status_code, 404)
+        self.assertEqual(self.public_client.get(upload.json["href"]).status_code, 404)
+        admin_index = self.admin_client.get("/").get_data(as_text=True)
+        self.assertIn("is-concealed", admin_index)
+        self.assertIn("icons.svg#eye-off", admin_index)
+        self.assertEqual(self.admin_client.get(f"/{slug}").status_code, 200)
+        for path in ("/assets/games/Windows/Games go here.txt", "/assets/Games/Windows/Games go here.txt"):
+            self.assertEqual(self.public_client.get(path).status_code, 404)
+        self.admin_client.put(f"/api/games/{game_id}", json={"hidden": False})
+        self.assertEqual(self.public_client.get(f"/{slug}").status_code, 200)
+
+    def test_front_page_filters_by_category_and_platform_with_dropdowns(self):
+        game_id, slug = self.create_game(categories=["Puzzle", "Co-op"])
+        self.create_game(title="Second", categories=["puzzle"], browser_url="")
+        self.upload(game_id, b"zip", "game.zip")
+        page = self.public_client.get("/").get_data(as_text=True)
+        self.assertRegex(page, r'<option value="puzzle">[Pp]uzzle \(2\)</option>')
+        self.assertIn('<option value="co-op">Co-op (1)</option>', page)
+        self.assertIn('<option value="windows">Windows</option>', page)
+        self.assertIn('<option value="browser">Nettleser</option>', page)
+        self.assertNotIn('<option value="mac">', page)
+        self.assertIn('href="/?category=puzzle"', self.public_client.get(f"/{slug}").get_data(as_text=True))
+
+    def test_site_settings_change_title_front_page_and_menu(self):
+        response = self.admin_client.put("/api/settings", json={
+            "site_title": "Skolens spill",
+            "hero_title": "Velkommen!",
+            "hero_text": 'Ønsker du et spill? <a href="https://forms.example/ny">Si fra</a><script>alert(1)</script>',
+            "nav": [
+                {"key": "games", "label": "", "hidden": False},
+                {"key": "link", "label": "Ønsk deg et spill", "url": "https://forms.example/ny", "new_tab": True},
+                {"key": "terms", "label": "Regler", "hidden": True},
+                {"key": "install", "label": "Hjelp", "hidden": False},
+            ],
+        })
+        self.assertEqual(response.status_code, 200, response.get_data(as_text=True))
+        page = self.public_client.get("/").get_data(as_text=True)
+        self.assertIn("<title>Skolens spill</title>", page)
+        self.assertIn("<h1>Velkommen!</h1>", page)
+        self.assertIn('<a href="https://forms.example/ny" target="_blank" rel="noopener noreferrer">Si fra</a>', page)
+        self.assertNotIn("alert(1)", page)
+        nav = page.split('class="site-nav"')[1].split("</nav>")[0]
+        self.assertLess(nav.index('href="/"'), nav.index("forms.example"))
+        self.assertLess(nav.index("forms.example"), nav.index('href="/install"'))
+        self.assertIn("Hjelp", nav)
+        self.assertNotIn("/vilkar", nav)
+        self.assertIn("<title>Installasjon · Skolens spill</title>", self.public_client.get("/install").get_data(as_text=True))
+
+        self.admin_client.put("/api/settings", json={"site_title": "", "hero_title": "", "hero_text": ""})
+        page = self.public_client.get("/").get_data(as_text=True)
+        self.assertIn("<h1>Spilldistribusjon</h1>", page)
+        self.assertNotIn('class="hero-text"', page)
+        self.assertIn("Spill", self.admin_client.get("/settings").get_data(as_text=True))
+
+    def test_settings_reject_unsafe_menu_links(self):
+        for url in ("javascript:alert(1)", "//evil.example", "", "#top"):
+            response = self.admin_client.put("/api/settings", json={"nav": [{"key": "link", "label": "X", "url": url}]})
+            self.assertEqual(response.status_code, 400, url)
+        self.assertEqual(self.admin_client.put("/api/settings", json={"nav": "nope"}).status_code, 400)
+        self.assertEqual(self.admin_client.put("/api/settings", json={"site_title": "x" * 101}).status_code, 400)
+        response = self.admin_client.put("/api/settings", json={"nav": [{"key": "link", "label": "Side", "url": "/vilkar#ansvar"}]})
+        self.assertEqual(response.status_code, 200)
+        nav = self.public_client.get("/").get_data(as_text=True).split('class="site-nav"')[1].split("</nav>")[0]
+        self.assertLess(nav.index("/vilkar#ansvar"), nav.index('href="/"'))
+
+    def test_logo_is_used_as_brand_and_favicon(self):
+        self.assertEqual(self.admin_client.post("/api/settings/logo", data=b"<svg/>").status_code, 400)
+        first = self.admin_client.post("/api/settings/logo", data=PNG, content_type="application/octet-stream")
+        self.assertEqual(first.status_code, 200, first.get_data(as_text=True))
+        second = self.admin_client.post("/api/settings/logo", data=PNG, content_type="application/octet-stream")
+        logo_url = second.json["logo_url"]
+        page = self.public_client.get("/").get_data(as_text=True)
+        self.assertIn(f'<link rel="icon" href="{logo_url}">', page)
+        self.assertIn(f'<img class="brand-logo" src="{logo_url}"', page)
+        with self.public_client.get(logo_url) as image:
+            self.assertEqual((image.status_code, image.mimetype, image.data), (200, "image/png", PNG))
+        self.assertEqual(self.public_client.get(first.json["logo_url"]).status_code, 404)
+        self.assertEqual(len(list(Path(self.admin.config["SITE_DIR"]).iterdir())), 1)
+        self.assertEqual(self.public_client.get("/favicon.ico").headers["Location"], logo_url)
+        self.assertEqual(self.admin_client.delete("/api/settings/logo").status_code, 200)
+        with self.public_client.get("/favicon.ico") as icon:
+            self.assertEqual(icon.status_code, 200)
+        self.assertIn('href="/assets/img/favicon.ico"', self.public_client.get("/").get_data(as_text=True))
+        self.assertEqual(list(Path(self.admin.config["SITE_DIR"]).iterdir()), [])
+
+    def test_install_and_terms_pages_can_be_rewritten(self):
+        install = self.public_client.get("/install").get_data(as_text=True)
+        self.assertIn('id="windows"', install)
+        self.assertIn('href="#mac"', install)
+        self.assertIn("Pakk ut alle", install)
+        self.assertIn("privat bruk", self.public_client.get("/vilkar").get_data(as_text=True))
+        custom = (
+            "<h1>Egen veiledning</h1><p>Intro</p><script>alert(1)</script>"
+            '<h2 data-icon="linux">Linux</h2><ol><li>Steg</li></ol>'
+            '<h2 data-icon="evil">Annet</h2><p>Tekst</p><hr><p>Fotnote</p>'
+        )
+        self.assertEqual(self.admin_client.put("/api/settings", json={"install_content": custom}).status_code, 200)
+        page = self.public_client.get("/install").get_data(as_text=True)
+        self.assertIn("<h1>Egen veiledning</h1>", page)
+        self.assertIn('<section class="guide-card rich" id="linux">', page)
+        self.assertIn('href="#linux"', page)
+        self.assertIn('id="annet"', page)
+        self.assertIn("icons.svg#book", page)
+        self.assertIn('class="guide-footnote rich"><p>Fotnote</p>', page)
+        self.assertNotIn("alert(1)", page)
+        self.assertNotIn("Pakk ut alle", page)
+        default = self.admin_client.get("/settings").get_data(as_text=True)
+        self.assertIn("Pakk ut alle", default)
+        from pages import PAGES
+
+        self.admin_client.put("/api/settings", json={"install_content": PAGES["install"]["default"]})
+        with Session(self.admin.extensions["database_engine"]) as session:
+            self.assertIsNone(session.get(Setting, "install_content"))
+        self.assertIn("Pakk ut alle", self.public_client.get("/install").get_data(as_text=True))
+
     def test_existing_schema_migrates_categories_links_downloads_and_cover(self):
         engine = make_engine(Path(self.temp_dir.name) / "legacy" / "gamedb.db")
         self.engines.append(engine)
@@ -433,7 +665,7 @@ class AdminLoginTests(unittest.TestCase):
         patcher = mock.patch.dict(os.environ, {"ADMIN_PASSWORD": "hemmelig", "SECRET_KEY": ""})
         patcher.start()
         self.addCleanup(patcher.stop)
-        self.app = create_admin_app(Path(self.temp_dir.name) / "data")
+        self.app = create_admin_app(Path(self.temp_dir.name) / "data", Path(self.temp_dir.name) / "games")
         self.addCleanup(self.app.extensions["database_engine"].dispose)
         self.client = self.app.test_client()
 
@@ -462,9 +694,47 @@ class AdminLoginTests(unittest.TestCase):
 
     def test_disabled_without_password(self):
         with mock.patch.dict(os.environ, {"ADMIN_PASSWORD": ""}):
-            app = create_admin_app(Path(self.temp_dir.name) / "open")
+            app = create_admin_app(Path(self.temp_dir.name) / "open", Path(self.temp_dir.name) / "games")
         self.addCleanup(app.extensions["database_engine"].dispose)
         self.assertEqual(app.test_client().get("/api/games").status_code, 200)
+
+    def login(self, client, password):
+        return client.post("/login", data={"password": password})
+
+    def test_password_can_be_changed_and_reset_to_the_environment_password(self):
+        other = self.app.test_client()
+        self.login(self.client, "hemmelig")
+        self.login(other, "hemmelig")
+        self.assertEqual(other.get("/api/games").status_code, 200)
+        self.assertIn("ADMIN_PASSWORD", self.client.get("/settings").get_data(as_text=True))
+        change = lambda **body: self.client.post("/api/settings/password", json=body)
+        self.assertEqual(change(current="feil", password="nytt-passord").status_code, 403)
+        self.assertEqual(change(current="hemmelig", password="kort").status_code, 400)
+        self.assertEqual(change(current="hemmelig", password="nytt-passord").status_code, 200)
+        self.assertEqual(self.client.get("/api/games").status_code, 200)
+        self.assertEqual(other.get("/api/games").status_code, 401)
+        self.assertEqual(self.login(other, "hemmelig").status_code, 401)
+        self.assertEqual(self.login(other, "nytt-passord").status_code, 302)
+
+        self.assertEqual(self.client.delete("/api/settings/password", json={"current": "hemmelig"}).status_code, 403)
+        reset = self.client.delete("/api/settings/password", json={"current": "nytt-passord"})
+        self.assertEqual((reset.status_code, reset.json["source"]), (200, "env"))
+        self.assertEqual(self.client.get("/api/games").status_code, 200)
+        self.assertEqual(other.get("/api/games").status_code, 401)
+        self.assertEqual(self.login(other, "hemmelig").status_code, 302)
+        self.assertEqual(self.client.delete("/api/settings/password", json={"current": "hemmelig"}).status_code, 400)
+
+    def test_saving_a_password_without_environment_password_turns_on_login(self):
+        with mock.patch.dict(os.environ, {"ADMIN_PASSWORD": ""}):
+            app = create_admin_app(Path(self.temp_dir.name) / "open", Path(self.temp_dir.name) / "games")
+        self.addCleanup(app.extensions["database_engine"].dispose)
+        owner = app.test_client()
+        self.assertEqual(owner.post("/api/settings/password", json={"password": "langt-passord"}).status_code, 200)
+        self.assertEqual(owner.get("/api/games").status_code, 200)
+        stranger = app.test_client()
+        self.assertEqual(stranger.get("/").status_code, 302)
+        self.assertEqual(stranger.post("/login", data={"password": "langt-passord"}).status_code, 302)
+        self.assertIn("Logg ut", stranger.get("/").get_data(as_text=True))
 
 
 if __name__ == "__main__":

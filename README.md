@@ -6,50 +6,56 @@
 [![Build Status](https://img.shields.io/github/actions/workflow/status/sondregronas/EduGameDist/CI.yml?branch=main)](https://github.com/sondregronas/EduGameDist/)
 [![GitHub latest commit](https://img.shields.io/github/last-commit/sondregronas/EduGameDist)](https://github.com/sondregronas/EduGameDist/commit/)
 
-En enkel, Docker-basert spilldistribusjon for skoler.
-<br>[Se demoen.](https://sondregronas.github.io/EduGameDist/)
+Simple, Docker-based game distribution for schools.
+<br>[See the demo.](https://sondregronas.github.io/EduGameDist/)
 
 <img src=".github/media/preview.webp" width="50%">
 
 </div>
 
-> **Ansvarsfraskrivelse:** Prosjektet er ment for lokal og intern bruk. Pass på at bare personer som har rett til det, får tilgang til nettsiden og filene. Kontroller distribusjonsrettigheter og lokale regler før bruk.
+> **Disclaimer:** This project is meant for local and internal use. Make sure only people who are entitled to it can reach the website and the files. Check distribution rights and local rules before use.
 
-> **Om bruk av KI:** Store deler av dette prosjektet er utviklet med hjelp av KI (GitHub Copilot). Vurder koden selv før du tar den i bruk i din organisasjon.
+> **About the use of AI:** Large parts of this project were developed with the help of AI (GitHub Copilot). Review the code yourself before using it in your organization.
 
-## Funksjoner
+The user interface is in Norwegian; the documentation is in English.
 
-- **To apper:** en offentlig, skrivebeskyttet nettside og en egen administrasjonsapp, som deler samme database og filer.
-- **Redigering direkte på siden:** admin ser ut som den offentlige siden, men med en **Rediger**-knapp. Tekst, kategorier, lenker og filer endres der du ser dem.
-- **Flere filer per plattform** (Windows, Mac, Linux, Android) og lenke til nettleserspill. Filer lastes opp i én forespørsel og lagres uendret, uten størrelsesgrense i appen.
-- **Import fra Steam:** tittel, beskrivelse, utvikler og omslagsbilde (lastes ned og lagres lokalt). GOG-, itch.io- og Humble-lenker søkes opp automatisk.
-- **Passordbeskyttet admin** med en enkel innloggingsside.
-- Eksisterende NocoDB-data migreres automatisk ved første oppstart.
+## Features
 
-## Installasjon
+- **Two apps:** a public, read-only website and a separate admin app that share the same database and files.
+- **Edit in place:** admin looks like the public site, but with an **Edit** button. Text, categories, links and files are changed where you see them.
+- **Several files per platform** (Windows, Mac, Linux, Android) and links to browser games. Files are uploaded in one request, stored unchanged under their own name in `games/<Platform>/<game>/`, with no size limit in the app.
+- **Hide games** from visitors with the eye icon on the admin dashboard, without deleting them.
+- **Category and platform filters** on the front page. Filtered views can be linked, e.g. `/?category=puzzle`.
+- **Import from Steam:** title, description, developer and cover image (downloaded and stored locally). GOG, itch.io and Humble links are looked up automatically.
+- **Settings in the browser:** site title, logo/favicon, front page heading and text, menu links (in any order), the installation guide and terms page, and the admin password.
+- **Password-protected admin** with a simple login page.
+- Existing NocoDB data and older uploads are migrated automatically on startup.
 
-Start tjenestene fra mappen med `docker-compose.yml`:
+## Installation
+
+Start the services from the folder that contains `docker-compose.yml`:
 
 ```bash
-ADMIN_PASSWORD=velg-et-passord docker compose up -d
+ADMIN_PASSWORD=choose-a-password docker compose up -d
 ```
 
-- Den offentlige nettsiden er tilgjengelig på port 80.
-- Admin publiseres **ikke** på en vertsport. Den ligger på Docker-nettverket `edugamedist_proxy_access`; koble Nginx Proxy Manager (NPM) til nettverket og opprett en proxy host til `admin:8081`.
-- Begrens tilgangen til både admin og den offentlige siden med NPM Access List eller brannmur etter behov. Alle som når den offentlige siden kan laste ned spillene.
+- The public website is available on port 80.
+- Game files are stored in `./games/<Platform>/<game>/` next to `docker-compose.yml`.
+- Admin is **not** published on a host port. It is on the Docker network `edugamedist_proxy_access`; connect Nginx Proxy Manager (NPM) to the network and create a proxy host for `admin:8081`.
+- Restrict access to both admin and the public site with an NPM Access List or a firewall as needed. Anyone who can reach the public site can download the games.
 
-Se [installasjonsdokumentasjonen](https://sondregronas.github.io/EduGameDist/docs/Installation/docker/) for proxy-, tilgangs- og opplastingsoppsett.
+See the [installation documentation](https://sondregronas.github.io/EduGameDist/docs/Installation/docker/) for proxy, access and upload setup, and [Updating](https://sondregronas.github.io/EduGameDist/docs/Updating/) if you are upgrading an existing installation.
 
-## Lokal utvikling
+## Local development
 
-Med [uv](https://docs.astral.sh/uv/) installert, start begge appene med live-reload fra prosjektroten:
+With [uv](https://docs.astral.sh/uv/) installed, start both apps with live reload from the project root:
 
 ```powershell
 uv sync; if ($?) { uv run --directory src python dev.py }
 ```
 
-Dette er PowerShell-kommandoen. I bash eller zsh bruker du `uv sync && uv run --directory src python dev.py`. Admin kjører på <http://localhost:8081> og den offentlige siden på <http://localhost:8080>. Se [utviklerdokumentasjonen](https://sondregronas.github.io/EduGameDist/docs/Contributing/) for detaljer. Bidrag og forslag er velkomne.
+That is the PowerShell command. In bash or zsh, use `uv sync && uv run --directory src python dev.py`. Admin runs on <http://localhost:8081> and the public site on <http://localhost:8080>. See the [developer documentation](https://sondregronas.github.io/EduGameDist/docs/Contributing/) for details. Contributions and suggestions are welcome.
 
-## Lisens
+## License
 
-Prosjektet bruker MIT-lisensen. Se [LICENSE](LICENSE). Ikonene er hentet fra [Material Design Icons](https://pictogrammers.com/library/mdi/) (Apache-2.0) og [Simple Icons](https://simpleicons.org/) (CC0).
+The project uses the MIT license. See [LICENSE](LICENSE). The icons come from [Material Design Icons](https://pictogrammers.com/library/mdi/) (Apache-2.0) and [Simple Icons](https://simpleicons.org/) (CC0).

@@ -1,14 +1,13 @@
-# Konfigurere frontend
+# Frontend
 
-I `docker-compose.yml` kan du endre nettstedstittelen med miljøvariabelen `TITLE`. Frontend-porten endres i tjenestens `ports`-seksjon. Standard er port `80`.
+The frontend is the public, read-only website. Its port is set in the service's `ports` section in `docker-compose.yml`; the default is port `80`.
 
-## Legge til spill
+## Adding games
 
-Spill administreres i den separate admin-appen. Endringer publiseres på frontend når de lagres. Se [[Adding games]] for mer informasjon.
+Games are managed in the separate admin app, and changes are published on the frontend as soon as they are saved. See [Adding games](../Usage/Adding-games.md).
 
-## Tilpasning
+## Customization
 
-CSS-overstyringer og favicon kan legges i `cfg`. Mappen monteres i frontend-containeren.
+The title, logo (favicon), front page heading and text, menu links, installation guide and terms are changed under **Innstillinger** (Settings) in admin, and take effect immediately without a restart. See [Personalization](../Usage/Personalization.md).
 
-> [!NOTE]+
-> Enkelte konfigurasjonsendringer kan kreve omstart: `docker compose restart frontend`.
+Visitors can filter the game list by category and platform. Filtered views can be linked to directly, for example `/?category=puzzle&platform=windows`, and the categories on a game's page link to the matching filter.
