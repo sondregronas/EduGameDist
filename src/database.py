@@ -182,7 +182,10 @@ def _slugify(value):
 
 def _legacy_cover_path(value):
     """Map an old NocoDB attachment path (e.g. /download/noco/Games/Games/Cover/x.jpg) to a legacy cover URL."""
-    path = "/" + unquote(urlparse(value).path).lstrip("/")
+    parsed = urlparse(value)
+    path = "/" + unquote(parsed.path).lstrip("/")
+    if parsed.netloc and not (path.startswith("/download/") and "/Cover/" in path):
+        return ""
     if path.startswith("/download/") or "/Cover/" in path:
         name = Path(path).name
         if Path(name).suffix:
@@ -196,7 +199,7 @@ def _legacy_cover_url(value):
     if not isinstance(value, str) or not value:
         return ""
     if _is_http_url(value):
-        return value
+        return _legacy_cover_path(value) or value
     try:
         parsed = json.loads(value)
     except json.JSONDecodeError:
@@ -205,7 +208,7 @@ def _legacy_cover_url(value):
         item = parsed[0] if isinstance(parsed, list) and parsed else parsed
         path = item.get("path") or item.get("url", "")
         if _is_http_url(path):
-            return _legacy_cover_path(path) if "/Cover/" in path else path
+            return _legacy_cover_path(path) or path
         return _legacy_cover_path(path) or (
             "/legacy-covers/" + unquote(Path(path).name) if path else ""
         )
@@ -252,7 +255,7 @@ def initialize_db(engine):
                 suffix += 1
             used_slugs.add(slug)
             game.cover_url = game.cover_url or _legacy_cover_url(game.cover)
-            if game.cover_url and not _is_http_url(game.cover_url) and not game.cover_url.startswith("/files/"):
+            if game.cover_url and not game.cover_url.startswith(("/files/", "/legacy-covers/")):
                 game.cover_url = _legacy_cover_path(game.cover_url) or game.cover_url
             game.slug = slug
 
@@ -373,7 +376,7 @@ def get_game(session, game_id):
     raw_cover = re.fullmatch(r"/files/(\d+)", cover)
     if raw_cover:
         cover = file_href(game.slug, raw_cover.group(1))
-    elif cover.startswith("/download/"):
+    else:
         cover = _legacy_cover_path(cover) or cover
     return {
         "id": game.id,

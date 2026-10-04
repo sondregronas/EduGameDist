@@ -9,7 +9,7 @@ Tittel, kort beskrivelse, omslagsbilde, utvikler og Steam-lenke fylles inn når 
 ## Spillinformasjon
 
 - **Tittel** og **beskrivelse** vises på oversikten og spillsiden.
-- **Lærernotat** vises som ren tekst på spillsiden.
+- **Lærernotat** vises på spillsiden. Du kan bruke enkel HTML: `<a href="https://…">lenke</a>`, `<br>`, `<p>`, `<b>`, `<i>`, `<u>`, `<ul>`, `<ol>` og `<li>`. Alt annet fjernes. Vanlige linjeskift beholdes.
 - **Omslagsbilde** kan hentes fra Steam, oppgis som en URL eller lastes opp under plattformen «Omslagsbilde».
 - **Antall spillere**, **spilletid**, **utvikler** og **utviklerens nettsted** er valgfrie.
 - **Kategorier** legges til med **+ Ny kategori** og fjernes med minus-knappen på hver kategori.

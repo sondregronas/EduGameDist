@@ -418,6 +418,7 @@ class EduGameDistAppTests(unittest.TestCase):
             self.assertEqual(downloads[0].stored_name, "legacy/windows/old-build.zip")
             self.assertEqual(game.cover_url, "/legacy-covers/legacy.jpg")
             self.assertEqual(database._legacy_cover_url("/download/noco/Games/Games/Cover/w0CeOl.jpg"), "/legacy-covers/w0CeOl.jpg")
+            self.assertEqual(database._legacy_cover_url("https://cdn.example/Cover/x.jpg"), "https://cdn.example/Cover/x.jpg")
             self.assertEqual(
                 database._legacy_cover_url(json.dumps([{"path": "download/noco/Games/Games/Cover/a%20b.jpg"}])),
                 "/legacy-covers/a b.jpg",
