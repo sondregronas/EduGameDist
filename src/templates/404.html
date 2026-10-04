@@ -1,0 +1,10 @@
+{% extends "base.html" %}
+{% from "_macros.html" import icon %}
+{% block content %}
+  <section class="hero">
+    <div class="empty-emoji">🕹️</div>
+    <h1>Fant ikke spillet</h1>
+    <p>Spillet kan være fjernet, eller adressen kan være feil.</p>
+    <a class="btn btn-primary" href="/">{{ icon('back') }}Tilbake til spilloversikten</a>
+  </section>
+{% endblock %}

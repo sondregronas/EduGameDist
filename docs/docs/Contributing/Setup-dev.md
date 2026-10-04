@@ -1,11 +1,36 @@
-# Setup for development
-Here's a quick, temporary guide to get started with development. You'll need to have NodeJS installed on your system.
+# Utviklingsmiljø
 
-1. Clone the repository
-2. Run `npm install` to install dependencies
-3. Run `npm run dev` to start the development server
-4. Navigate to `localhost:80` to view the frontend, it should automatically open in your browser and reload on changes
+Installer Python 3.10 eller nyere og [uv](https://docs.astral.sh/uv/), klon prosjektet og kjør kommandoen som passer skallet ditt fra prosjektroten:
 
-Currently, the backend is not included in the development server. You will need to run the backend separately, any database viewer should work. I will attempt to generate a mock database in the future.
+```powershell
+uv sync; if ($?) { uv run --directory src python dev.py }
+```
 
-Alternatively you can create a dev environment by running the `docker-compose.yml` file and mounting the `/app` folder to the `src` directory.
+For bash eller zsh:
+
+```bash
+uv sync && uv run --directory src python dev.py
+```
+
+Begge kommandoene starter appene med `FLASK_DEBUG=1` (live-reload og debugger):
+
+| App | Adresse |
+| --- | --- |
+| Admin | <http://localhost:8081> |
+| Offentlig side | <http://localhost:8080> |
+
+Avslutt begge med `Ctrl+C`. Python-filer og maler lastes inn på nytt automatisk; CSS og JavaScript leses fra disk, så det holder å laste siden på nytt.
+
+Databasen og opplastede filer ligger i `src/data` (kan endres med `DATA_DIR`). Sett `ADMIN_PASSWORD` først hvis du vil teste innloggingen:
+
+```powershell
+$env:ADMIN_PASSWORD = "test"; uv sync; if ($?) { uv run --directory src python dev.py }
+```
+
+```bash
+ADMIN_PASSWORD=test uv sync && ADMIN_PASSWORD=test uv run --directory src python dev.py
+```
+
+Porter kan endres med `ADMIN_PORT` og `PUBLIC_PORT`. Kjør testene med `uv run --directory src python -m unittest discover -s tests`.
+
+> Debug-modus tillater kjøring av kode gjennom feilsiden og skal aldri brukes ved utrulling.

@@ -1,0 +1,13 @@
+[project]
+name = "edugamedist"
+version = "2.0.0"
+description = "A game distribution platform for educational settings"
+requires-python = ">=3.10"
+dependencies = [
+    "Flask>=3.0,<4.0",
+    "SQLAlchemy>=2.0,<3.0",
+    "gunicorn>=22.0,<24.0",
+]
+
+[tool.uv]
+package = false

@@ -1,0 +1,36 @@
+{% from "_macros.html" import icon %}
+<!doctype html>
+<html lang="no">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>{% if title and title != site_title %}{{ title }} · {% endif %}{{ site_title }}{% if admin %} (admin){% endif %}</title>
+  <link rel="stylesheet" href="/assets/cfg/override.css">
+  <link rel="stylesheet" href="/assets/css/app.css">
+  <link rel="icon" href="/assets/cfg/favicon.ico">
+  {% block head %}{% endblock %}
+</head>
+<body class="{% if admin %}is-admin{% endif %}">
+  <header class="site-header">
+    <div class="wrap header-inner">
+      <a class="brand" href="/">{{ icon('gamepad') }}<span>{{ site_title }}</span>{% if admin %}<span class="badge badge-admin">Admin</span>{% endif %}</a>
+      <nav class="site-nav" aria-label="Hovedmeny">
+        <a href="/">{{ icon('gamepad') }}<span>Spill</span></a>
+        <a href="/install">{{ icon('book') }}<span>Installasjon</span></a>
+        <a href="/vilkar">{{ icon('shield') }}<span>Vilkår</span></a>
+        {% if admin %}<a href="{{ public_url }}" target="_blank" rel="noopener noreferrer">{{ icon('external') }}<span>Åpne nettsiden</span></a>{% endif %}
+        {% if auth_enabled and session.get('auth') %}<form method="post" action="/logout" class="logout-form"><button type="submit" class="nav-button">{{ icon('logout') }}<span>Logg ut</span></button></form>{% endif %}
+      </nav>
+    </div>
+  </header>
+  <main class="wrap page">{% block content %}{% endblock %}</main>
+  <footer class="site-footer">
+    <div class="wrap">
+      <span>Laget med ♥ av <a href="https://github.com/sondregronas/EduGameDist" target="_blank" rel="noopener noreferrer">Sondre Grønås</a></span>
+      {% if admin %}<a href="https://sondregronas.github.io/EduGameDist/docs/" target="_blank" rel="noopener noreferrer">Dokumentasjon</a>{% endif %}
+    </div>
+  </footer>
+  <div id="toasts" aria-live="polite"></div>
+  {% block scripts %}{% endblock %}
+</body>
+</html>

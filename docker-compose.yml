@@ -1,35 +1,71 @@
 services:
+  admin:
+    image: ghcr.io/sondregronas/edugamedist
+    restart: unless-stopped
+    command:
+      - gunicorn
+      - --worker-class
+      - gthread
+      - --workers
+      - "2"
+      - --threads
+      - "4"
+      - --timeout
+      - "0"
+      - --bind
+      - 0.0.0.0:8081
+      - app:create_admin_app()
+    expose:
+      - 8081
+    volumes:
+      - ./cfg:/app/public/cfg
+      - game_db:/app/data
+      - game_covers:/app/data/legacy-covers
+    environment:
+      - TITLE=Spillserver
+      - DATA_DIR=/app/data
+      - PUBLIC_URL=${PUBLIC_URL:-http://localhost/}
+      # Passord for innlogging i admin. Tom verdi = ingen innlogging (kun NPM-tilgangsstyring).
+      - ADMIN_PASSWORD=${ADMIN_PASSWORD:-}
+    healthcheck:
+      test:
+        - CMD
+        - python
+        - -c
+        - "import urllib.request; urllib.request.urlopen('http://127.0.0.1:8081/health', timeout=2)"
+      interval: 10s
+      timeout: 3s
+      retries: 5
+    networks:
+      - default
+      - npm_proxy
+
   frontend:
     image: ghcr.io/sondregronas/edugamedist
     restart: unless-stopped
     ports:
       - 80:80
+    depends_on:
+      admin:
+        condition: service_healthy
     volumes:
-      # Game installer locations
-      - ./games/Windows:/app/public/games/Windows
-      - ./games/Mac:/app/public/games/Mac
-      - ./games/Linux:/app/public/games/Linux
-      - ./games/Android:/app/public/games/Android
-
-      # Configuration files
+      # Kun for eldre installasjoner: filer fra tidligere versjoner serveres herfra
+      - ./games/Windows:/app/public/games/Windows:ro
+      - ./games/Mac:/app/public/games/Mac:ro
+      - ./games/Linux:/app/public/games/Linux:ro
+      - ./games/Android:/app/public/games/Android:ro
       - ./cfg:/app/public/cfg
-      - ./cfg/views:/app/views/cfg  # (remove trailing /cfg if you want access to all views)
-      # - ./cfg/css:/app/public/css
-
-      # Persistent data, leave as is or map to a local folder
-      - game_db:/app/db
-      - game_covers:/app/public/img
+      - game_db:/app/data
+      - game_covers:/app/data/legacy-covers
     environment:
-      - TITLE=Game Server
-  db:
-    image: nocodb/nocodb
-    restart: unless-stopped
-    ports:
-      - 8080:8080
-    volumes:
-      # Persistent data, leave as is or map to a local folder
-      - game_db:/usr/app/data/
-      - game_covers:/usr/app/data/nc/uploads/noco/Games/Games/Cover
+      - TITLE=Spillserver
+      - DATA_DIR=/app/data
+
+networks:
+  npm_proxy:
+    name: edugamedist_proxy_access
+    driver: bridge
+
 volumes:
   game_db:
   game_covers:

@@ -7,7 +7,7 @@ Some goals might be a bit too ambitious or not feasible. If you have any suggest
 The current UI is a bit of a mess and old-fashioned. It is also not very mobile friendly (not that it is a priority, but it would be nice to have). I will attempt to re-design the frontend using [Tailwind](https://tailwindcss.com/) when I feel more comfortable with it. Alternatively a different framework might be worth looking into, like Svelte or React.
 
 ## Backend
-The backend is not as intuitive as it could be, which might be a problem for teachers who are not very tech-savvy. It would be nice to have a more intuitive way to manage the database. The NocoDB service is a good start, but I'd prefer to have a more integrated solution that is easier to use and maintain.
+The integrated admin application now provides a teacher-friendly way to manage games. Future work may improve roles and collaborative editing; access to the admin app is currently controlled by the deployment's Nginx Proxy Manager configuration.
 
 ## Metadata scraping
 An integration with something like https://thegamesdb.net/ for example would be nice, where you can watch a games' folder, or select games from a list, and it will automatically add the game and relevant metadata to the database. (Potentially via https://github.com/Sude-/lgogdownloader)

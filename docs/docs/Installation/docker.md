@@ -1,50 +1,48 @@
-# Installation
-The entire project is dockerized, so you can run it using docker-compose. You can also run it without docker, but you will need to install the dependencies manually.
+# Docker-installasjon
 
-## Docker installation
-Make sure you have docker and docker-compose installed.
+EduGameDist består av to Flask-apper som deler SQLite-database og fillager:
 
-1. Download the [docker-compose.yml](https://github.com/sondregronas/EduGameDist/blob/main/docker-compose.yml) file from the repository, or see the docker-compose file below.
-2. Modify the `docker-compose.yml` file to your liking. (**Note**: Might interfere with updates if you mount more than the `cfg` folders)
-3. Run `docker-compose up -d` in the folder where the `docker-compose.yml` file is located.
-4. Wait for the containers to start, this may take a while the first time.
-5. Visit `<ip-address>:80` in your browser to verify that the frontend is running.
+- **Frontend** viser spill og filer. Den har ingen endepunkter for å endre innhold.
+- **Admin** lar deg redigere spill og laste opp filer. Den er ikke publisert på en vertsport; tilgang skal styres av Nginx Proxy Manager (NPM).
 
-Example `docker-compose.yml`:
-```yaml
-services:
-  frontend:
-    image: ghcr.io/sondregronas/edugamedist
-    restart: unless-stopped
-    ports:
-      - 80:80
-    volumes:
-      # Game installer locations
-      - ./games/Windows:/app/public/games/Windows
-      - ./games/Mac:/app/public/games/Mac
-      - ./games/Linux:/app/public/games/Linux
-      - ./games/Android:/app/public/games/Android
+## Start
 
-      # Configuration files
-      - ./cfg:/app/public/cfg
-      - ./cfg/views:/app/views/cfg  # (remove trailing /cfg if you want access to all views)
-      # - ./cfg/css:/app/public/css
+Kopier `docker-compose.yml` til en egen mappe og start tjenestene:
 
-      # Persistent data, leave as is or map to a local folder
-      - game_db:/app/db
-      - game_covers:/app/public/img
-    environment:
-      - TITLE=Game Server
-  db:
-    image: nocodb/nocodb
-    restart: unless-stopped
-    ports:
-      - 8080:8080
-    volumes:
-      # Persistent data, leave as is or map to a local folder
-      - game_db:/usr/app/data/
-      - game_covers:/usr/app/data/nc/uploads/noco/Games/Games/Cover
-volumes:
-  game_db:
-  game_covers:
+```bash
+docker compose up -d
 ```
+
+Frontend blir tilgjengelig på port 80. Docker Compose oppretter også nettverket `edugamedist_proxy_access`. Koble NPM-containeren til nettverket:
+
+```bash
+docker network connect edugamedist_proxy_access <NPM-container>
+```
+
+I NPM oppretter du en Proxy Host med:
+
+- **Forward Hostname / IP:** `admin`
+- **Forward Port:** `8081`
+- **Scheme:** `http`
+- **Access List:** velg en liste som bare gir tilgang til godkjente brukere eller nettverk
+
+Ikke legg til en `ports:`-mapping for admin-tjenesten. Docker-nettverket og NPM skal være veien inn til administrasjonen. Begrens også den offentlige frontend-tjenesten med NPM eller brannmur hvis spillene ikke skal være tilgjengelige for alle.
+
+For at store filer skal kunne lastes opp gjennom NPM, legg til følgende i NPM-vertens **Advanced**-felt:
+
+```nginx
+client_max_body_size 0;
+proxy_request_buffering off;
+proxy_read_timeout 3600s;
+proxy_send_timeout 3600s;
+```
+
+Filer lastes opp i én strømmet forespørsel og lagres uendret. `client_max_body_size 0` fjerner proxyens størrelsesgrense, og `proxy_request_buffering off` hindrer at NPM mellomlagrer hele filen på disk først. Det finnes ingen samlet opplastingsgrense i appen; reell kapasitet bestemmes av ledig diskplass. SQLite-database og opplastede filer ligger i Docker-volumene `game_db` og `game_covers`.
+
+## Eksisterende installasjoner
+
+Den eksisterende `game_db`-volumstrukturen beholdes. Ved oppstart migreres spill, kategorier, butikklenker og plattformnedlastinger fra den gamle SQLite-tabellen automatisk til den nye strukturen. Behold sikkerhetskopi av begge volumene før oppgradering. NocoDB-tjenesten startes ikke lenger; slett ikke de gamle volumene før du har kontrollert at spill, omslag og nedlastinger er med.
+
+## Konfigurasjon
+
+Endre `TITLE` og `PUBLIC_URL` i `docker-compose.yml`. Spillfiler som var lagt inn manuelt kan fortsatt monteres fra `./games/<plattform>`. Konfigurasjonsfiler for CSS/favikon kan monteres fra `./cfg`.

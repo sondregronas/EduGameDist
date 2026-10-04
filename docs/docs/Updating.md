@@ -7,7 +7,6 @@ docker-compose up -d
 
 Alternatively you can use something like Watchtower to automatically update your containers.
 
-## New database features
-Currently, there is no simple way of updating your instance in case of database changes, so adding additional features must be done manually. Be sure to create a backup of both `noco.db.defaults` and `gamedb.db` before updating.
+## Database changes
 
-I intend to tackle this later, but for now the database columns in `gamedb.db` will not change, so worst case you'll lose out on new features when and if they are added.
+The application applies its SQLite schema migrations automatically on startup. Back up both Docker volumes (`game_db` and `game_covers`) before updating. Legacy game records, categories, store links and platform downloads are migrated on first startup; the old NocoDB metadata database is no longer used.

@@ -1,16 +1,14 @@
-# Configuring the frontend
-Inside the `docker-compose.yml` file, you can configure the title of the website by changing the `TITLE` environment variable. 
+# Konfigurere frontend
 
-You can also configure the port that the frontend is exposed on by changing the `ports` section. The default port is `80`.
+I `docker-compose.yml` kan du endre nettstedstittelen med miljøvariabelen `TITLE`. Frontend-porten endres i tjenestens `ports`-seksjon. Standard er port `80`.
 
-## Adding games
-All games are managed by the backend, once added to the backend, they will be available on the frontend (within 15 minutes).
+## Legge til spill
 
-See [[Adding games]] for more information.
+Spill administreres i den separate admin-appen. Endringer publiseres på frontend når de lagres. Se [[Adding games]] for mer informasjon.
 
-## Personalization
-The frontend can be personalized by changing the files in the `cfg` folder. The `cfg` folder is mounted to the frontend container, so any changes you make to the files will be reflected on the frontend.
+## Tilpasning
+
+CSS-overstyringer og favicon kan legges i `cfg`. Mappen monteres i frontend-containeren.
 
 > [!NOTE]+
-> Updating config may require a restart of the frontend container.
-> To restart the frontend container, run `docker-compose restart` in the folder where the `docker-compose.yml` file is located.
+> Enkelte konfigurasjonsendringer kan kreve omstart: `docker compose restart frontend`.

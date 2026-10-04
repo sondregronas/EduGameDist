@@ -1,28 +1,7 @@
-# Modifying games
-The backend provides by default 2 different views for modifying games. You're free to add more views if you want to, but the default views should be enough for most use cases.
+# Endre spill
 
-The first view is the `Games` table, which provides a traditional table view of the games. This view is useful for quickly editing a game, but it's not very user-friendly.
+Åpne administrasjonsappen via Nginx Proxy Manager og velg et spill. Siden ser ut som den offentlige, men har en **Rediger**-knapp. I redigeringsmodus endrer du tekst, kategorier og lenker direkte på siden. Trykk **Lagre** for å publisere; den offentlige nettsiden leser de nye verdiene med en gang.
 
-The second view is the `Friendly` view, which provides a card view of the games. This view is more user-friendly, but has fewer features than the `Games` table.
+Du kan endre alle metadatafeltene, legge til eller fjerne kategorier og butikklenker, oppdatere Steam-informasjon (**Hent fra Steam**), finne butikklenker automatisk (**Finn butikklenker**), og laste opp eller fjerne filer for hver plattform. Det er ingen fast grense på tre kategorier, fem butikklenker eller én fil per plattform.
 
-## Games table
-Supports search, sorting, pagination, and filtering. You can also add new games from this view, but it's not very user-friendly. Use this view to make adjustments to existing games that are already in the database.
-
-## Friendly view
-Provides a card view of the games. This view is more user-friendly, but has limited editing capabilities, perfect for teachers that don't want to mess with the database.
-
-By default, this view contains the following fields:
-
-- [ ] **Title**
-- [ ] **Note**
-- [ ] **Cover**
-- [ ] **Time**
-- [ ] **Players**
-- [ ] **Category**
-
-The reason for this is that the other fields normally shouldn't require any editing.
-
-## New entry
-A form for adding new games.
-
-See [[Adding games]] for more information.
+Når du sletter et spill, slettes også filene som er lastet opp gjennom administrasjonsappen. Gamle filer som administreres manuelt i `./games/<plattform>` slettes ikke fra disken.

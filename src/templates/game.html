@@ -1,0 +1,184 @@
+{% extends "base.html" %}
+{% from "_macros.html" import icon %}
+{% block head %}
+  <meta name="description" content="{{ game.description }}">
+  <meta property="og:title" content="{{ game.title }}">
+  <meta property="og:type" content="website">
+  <meta property="og:description" content="{{ game.description }}">
+  {% if game.cover %}<meta property="og:image" content="{{ game.cover }}">{% endif %}
+  {% if admin %}<script src="/assets/js/admin.js" defer></script>{% endif %}
+{% endblock %}
+{% block content %}
+{% set platform_names = {'browser': 'Nettleser', 'windows': 'Windows', 'mac': 'Mac', 'linux': 'Linux', 'android': 'Android'} %}
+<article id="game"{% if admin %} data-game-id="{{ game.id }}"{% endif %}>
+  <div class="crumbs">
+    <a class="back-link" href="/">{{ icon('back') }}Alle spill</a>
+    {% if admin %}<button type="button" class="btn btn-primary" id="edit-toggle">{{ icon('edit') }}Rediger</button>{% endif %}
+  </div>
+
+  <section class="game-hero">
+    <div class="game-media">
+      <div class="cover-frame">
+        <img id="cover-img" class="game-cover" alt="Omslagsbilde for {{ game.title }}"{% if game.cover %} src="{{ game.cover }}"{% else %} hidden{% endif %}>
+        <div id="cover-placeholder" class="cover-placeholder"{% if game.cover %} hidden{% endif %}>{{ icon('gamepad') }}</div>
+      </div>
+      {% if admin %}
+        <div class="cover-tools edit-only">
+          <label class="btn btn-small">{{ icon('image') }}Last opp bilde<input type="file" id="cover-file" accept="image/png,image/jpeg,image/webp,image/gif" hidden></label>
+          <button type="button" class="btn btn-small btn-ghost" id="cover-remove">{{ icon('trash') }}Fjern</button>
+          <input class="ghost" id="cover-url" placeholder="…eller lim inn en bildelenke (lastes ned ved lagring)" aria-label="Bildelenke">
+        </div>
+      {% endif %}
+    </div>
+
+    <div class="game-info">
+      <h1 class="game-title view-only">{{ game.title }}</h1>
+      {% if admin %}<input class="ghost ghost-title edit-only" data-field="title" value="{{ game.title }}" maxlength="250" placeholder="Tittel" aria-label="Tittel">{% endif %}
+
+      {% if game.developer %}
+        <p class="game-developer view-only">Utviklet av
+          {% if game.developer_link %}<a href="{{ game.developer_link }}" target="_blank" rel="noopener noreferrer">{{ game.developer }}</a>{% else %}<strong>{{ game.developer }}</strong>{% endif %}
+        </p>
+      {% endif %}
+      {% if admin %}
+        <div class="dev-edit edit-only">
+          <label class="field"><span>Utvikler</span><input class="ghost" data-field="developer" value="{{ game.developer }}" placeholder="Utviklernavn"></label>
+          <label class="field"><span>Utviklerens nettsted</span><input class="ghost" data-field="developer_link" type="url" value="{{ game.developer_link }}" placeholder="https://…"></label>
+        </div>
+      {% endif %}
+
+      {% if game.description %}<p class="game-description view-only">{{ game.description }}</p>{% endif %}
+      {% if admin %}<textarea class="ghost ghost-text edit-only" data-field="description" rows="4" placeholder="Beskrivelse" aria-label="Beskrivelse">{{ game.description }}</textarea>{% endif %}
+    </div>
+  </section>
+
+  <section class="game-meta">
+      <div class="chips">
+        {% if game.players %}<span class="chip view-only">{{ icon('user' if game.players == '1' else 'users') }}{{ game.players }} {{ 'spiller' if game.players == '1' else 'spillere' }}</span>{% endif %}
+        {% if game.ttb %}<span class="chip view-only">{{ icon('clock') }}{{ game.ttb }}</span>{% endif %}
+        {% for category in game.category %}<span class="tag view-only" style="--h: {{ category|hue }}">{{ category }}</span>{% endfor %}
+        {% if admin %}
+          <label class="chip chip-edit edit-only">{{ icon('users') }}<input data-field="players" value="{{ game.players }}" placeholder="Spillere (1 eller 2–4)" size="20"></label>
+          <label class="chip chip-edit edit-only">{{ icon('clock') }}<input data-field="time" value="{{ game.ttb }}" placeholder="Spilletid (30 min)" size="20"></label>
+        {% endif %}
+      </div>
+
+      {% if game.note %}<div class="callout view-only">{{ icon('info') }}<p>{{ game.note }}</p></div>{% endif %}
+      {% if admin %}
+        <label class="field edit-only"><span>Merknad som vises på spillsiden (f.eks. tips til lærere)</span>
+          <textarea class="ghost ghost-text" data-field="note" rows="2" placeholder="Valgfritt">{{ game.note }}</textarea></label>
+      {% endif %}
+
+      {% if admin %}
+        <div class="tag-editor edit-only" id="tag-editor">
+          <span class="field-label">Kategorier</span>
+          <div class="tag-list" id="tag-list">
+            {% for category in game.category %}
+              <span class="tag tag-editable" style="--h: {{ category|hue }}" data-value="{{ category }}"><span>{{ category }}</span><button type="button" class="tag-remove" aria-label="Fjern {{ category }}">{{ icon('minus') }}</button></span>
+            {% endfor %}
+            <span class="tag-add">
+              <button type="button" class="tag-add-btn" id="tag-add-btn">{{ icon('plus') }}<span>Ny kategori</span></button>
+              <input class="tag-input" id="tag-input" placeholder="Skriv eller velg …" maxlength="100" autocomplete="off" role="combobox" aria-expanded="false" aria-controls="tag-menu" hidden>
+              <div class="tag-menu" id="tag-menu" role="listbox" hidden></div>
+            </span>
+          </div>
+        </div>
+      {% endif %}
+
+  </section>
+
+  {% set has_files = game.files | selectattr('platform', 'in', ['windows', 'mac', 'linux', 'android']) | list | length > 0 %}
+  {% if admin or has_files or game.browser_url %}
+  <section class="downloads" id="downloads">
+    <h2>{{ icon('download' if (has_files or admin) else 'browser') }}{% if admin %}Spill og nedlastinger{% elif has_files %}Last ned og spill{% else %}Spill{% endif %}</h2>
+    <p class="section-sub view-only">{% if has_files %}Last ned spillet til maskinen din.{% elif game.browser_url %}Spill direkte i nettleseren.{% else %}Last opp filer eller legg inn en lenke.{% endif %}</p>
+    {% if admin %}<p class="hint edit-only">Filer lastes opp og slettes med én gang. Det finnes ingen størrelsesgrense, men store filer tar tid, så la siden stå åpen.</p>{% endif %}
+    <div class="platform-grid">
+      {% for key, label in platform_names.items() %}
+        {% set files = game.files | selectattr('platform', 'equalto', key) | list %}
+        {% set has_content = files or (key == 'browser' and game.browser_url) %}
+        {% if admin or has_content %}
+          <div class="platform-block{% if not has_content %} is-empty{% endif %}" data-platform="{{ key }}">
+            <header class="platform-head">
+              <span class="platform-icon">{{ icon(key) }}</span><h3>{{ label }}</h3>
+              {% if key in ('windows', 'mac') %}<a class="help-link" href="/install#{{ key }}" title="Slik installerer du på {{ label }}">{{ icon('help') }}<span>Hjelp</span></a>{% endif %}
+            </header>
+            {% if key == 'browser' %}
+              {% if game.browser_url %}
+                <a class="download-btn view-only" href="{{ game.browser_url }}" target="_blank" rel="noopener noreferrer">{{ icon('external') }}<span class="file-name">Spill i nettleseren</span></a>
+              {% endif %}
+              {% if admin %}<input class="ghost edit-only" data-field="browser_url" type="url" value="{{ game.browser_url }}" placeholder="Lenke til spillet i nettleseren (https://…)" aria-label="Nettleserlenke">{% endif %}
+            {% else %}
+              <ul class="file-list">
+                {% for file in files %}
+                  <li data-file-id="{{ file.id }}">
+                    <a class="download-btn" href="{{ file.href }}"{% if file.url %} target="_blank" rel="noopener noreferrer"{% endif %}>{{ icon('download') }}<span class="file-name">{{ file.name }}</span>{% if file.size_text %}<span class="file-size">{{ file.size_text }}</span>{% endif %}</a>
+                    {% if admin %}<button type="button" class="icon-btn danger edit-only file-delete" aria-label="Slett {{ file.name }}">{{ icon('trash') }}</button>{% endif %}
+                  </li>
+                {% endfor %}
+              </ul>
+              {% if admin %}
+                <label class="dropzone edit-only" data-platform="{{ key }}">
+                  {{ icon('upload') }}<span>Slipp filer her, eller klikk for å velge</span>
+                  <input type="file" multiple hidden>
+                </label>
+                <div class="uploads edit-only"></div>
+              {% endif %}
+            {% endif %}
+          </div>
+        {% endif %}
+      {% endfor %}
+    </div>
+  </section>
+  {% endif %}
+
+  {% if admin or game.links %}
+  <section class="game-links">
+    {% if game.links %}
+      <div class="store-links view-only">
+        <span class="field-label">Finn spillet hos</span>
+        <div class="link-pills">
+          {% for link in game.links %}
+            <a class="link-pill store-{{ link.key }}" href="{{ link.url }}" target="_blank" rel="noopener noreferrer">{{ icon(link.key) }}<span>{{ link.label }}</span></a>
+          {% endfor %}
+        </div>
+      </div>
+    {% endif %}
+    {% if admin %}
+      <div class="link-editor edit-only" id="link-editor">
+        <span class="field-label">Butikklenker</span>
+        <div class="link-pills" id="link-list">
+          {% for link in game.links %}
+            <span class="link-pill store-{{ link.key }}" data-url="{{ link.url }}">{{ icon(link.key) }}<span>{{ link.label }}</span><button type="button" class="tag-remove" aria-label="Fjern {{ link.label }}">{{ icon('minus') }}</button></span>
+          {% endfor %}
+          <span class="tag-add">
+            <button type="button" class="tag-add-btn" id="link-add-btn">{{ icon('plus') }}<span>Ny lenke</span></button>
+            <input class="tag-input" id="link-input" type="url" placeholder="https://… og Enter" hidden>
+          </span>
+        </div>
+      </div>
+    {% endif %}
+  </section>
+  {% endif %}
+
+  {% if has_files %}<p class="game-disclaimer">Når du laster ned innhold fra denne siden, godtar du <a href="/vilkar">vilkårene</a>.</p>{% endif %}
+
+  {% if admin %}
+    <div class="edit-bar edit-only" id="edit-bar">
+      <div class="steam-pop" id="steam-pop" hidden>
+        <input id="steam-input" placeholder="Steam-lenke, app-ID eller spillnavn" value="{{ game.steam_app_id }}" aria-label="Steam">
+        <button type="button" class="btn btn-primary" id="steam-fetch">{{ icon('wand') }}Hent</button>
+      </div>
+      <div class="wrap edit-bar-inner">
+        <button type="button" class="btn" id="steam-open">{{ icon('steam') }}Hent fra Steam</button>
+        <button type="button" class="btn" id="stores-find">{{ icon('search') }}Finn butikklenker</button>
+        <span class="spacer"></span>
+        <button type="button" class="btn btn-danger" id="delete-game">{{ icon('trash') }}Slett spill</button>
+        <button type="button" class="btn btn-ghost" id="cancel-edit">Avbryt</button>
+        <button type="button" class="btn btn-primary" id="save-edit">{{ icon('save') }}Lagre</button>
+      </div>
+    </div>
+    <script type="application/json" id="editor-data">{{ editor|tojson }}</script>
+  {% endif %}
+</article>
+{% endblock %}

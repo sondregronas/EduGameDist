@@ -130,4 +130,8 @@ dist
 gamedb.db
 src/public/img/
 src/demo/
-src/demo.js
+src/data/
+__pycache__/
+**/__pycache__/
+.venv/
+.pytest_cache/

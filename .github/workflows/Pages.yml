@@ -8,14 +8,14 @@ on:
       - 'README.md'
       - 'CONTRIBUTING.md'
       - 'docker-compose.yml'
-      
+
 concurrency:
-  group: "pages"
+  group: pages
   cancel-in-progress: true
 
 jobs:
   build-gh-pages:
-    name: Build GH Pages
+    name: Build GitHub Pages
     runs-on: ubuntu-latest
     environment:
       name: github-pages
@@ -27,45 +27,33 @@ jobs:
     if: ${{ !contains(github.event.head_commit.message, '[skip ci]') }}
     steps:
       - name: Checkout repository
-        uses: actions/checkout@v3
-        
-      - name: Move Demo to src
-        run: cp .github/workflows/demo.js src/
+        uses: actions/checkout@v7
 
-      - name: Install Node.js
-        uses: actions/setup-node@v3
+      - name: Set up Python
+        uses: actions/setup-python@v7
         with:
-          node-version: 16
+          python-version: '3.14'
 
-      - name: Install dependencies
-        working-directory: ./src
-        run: npm install
-
-      - name: Build Demo
-        working-directory: ./src
+      - name: Install application dependencies
         run: |
-          node demo.js
-          cp -R ../.github/workflows/demo-img/* demo/
+          python -m pip install --upgrade pip
+          python -m pip install -r src/requirements.txt
 
-      - name: Install Python
-        uses: actions/setup-python@v3
-        with:
-          python-version: 3.9
+      - name: Build static demo
+        run: python src/demo.py
 
-      - name: Build MkDocs
-        working-directory: ./docs
+      - name: Build documentation
+        working-directory: docs
         run: |
-          pip install setuptools wheel
-          pip install -r requirements.txt
+          python -m pip install -r requirements.txt
           mkdocs build
           cp -R site/ ../src/demo/docs
-          
+
       - name: Upload artifact
-        uses: actions/upload-pages-artifact@v1
+        uses: actions/upload-pages-artifact@v5
         with:
-          name: github-pages
           path: src/demo
 
       - name: Deploy to GitHub Pages
         id: deployment
-        uses: actions/deploy-pages@v1
+        uses: actions/deploy-pages@v5

@@ -1,27 +1,37 @@
-# Limiting access
-**Please do not expose your instance to the internet, take extra steps to ensure access is limited to your local network.**
+# Begrense tilgang
 
-## A-record
-If you own a domain name, you can create an `A-record` pointing to the IP-address of your local server, which will automatically point to port 80. Be sure to not expose anything to WAN (the internet), only LAN (your local network).
+**Admin kan beskyttes med et passord (`ADMIN_PASSWORD`), men bør i tillegg begrenses av Nginx Proxy Manager (NPM). Ikke gjør admin-tjenesten offentlig tilgjengelig uten passord, en NPM Access List eller en tilsvarende regel.**
 
-## NginxProxyManager
-The recommended way to expose your instance to the internet is to use [NginxProxyManager](https://nginxproxymanager.com/). This will allow you to create URLs for both frontend and backend. Be sure to restrict access to the server to only your local network for the frontend, as games **WILL** be accessible for download from the frontend.
+Admin-tjenesten er bare koblet til Docker-nettverket `edugamedist_proxy_access`; Compose publiserer ingen vertsport for den. Koble NPM-containeren til nettverket og send trafikken til `admin:8081`.
 
-### Access lists
-To restrict access to the frontend, you can use the `Access Lists` feature in NginxProxyManager. This will allow you to restrict access to the frontend to only your local network.
+## Innlogging med passord
 
-> [!INFO]+ RFC1918 Access List
-> With the `RFC1918 Access List` in NginxProxyManager you can restrict access to your local network. This will allow you to expose the frontend to the internet, while still restricting access to your local network.
-> 
-> The IP-addresses used in the `RFC1918 Access List` are:
-> ```
-> 192.168.0.0/16
-> 172.16.0.0/12
-> 10.0.0.0/8
-> ```
+Sett miljøvariabelen `ADMIN_PASSWORD` for admin-tjenesten (i `docker-compose.yml` eller en `.env`-fil ved siden av den):
 
-## Uploading games
-Uploading games can either be done via [network shares (Samba/CIFS)](https://support.microsoft.com/en-us/windows/file-sharing-over-a-network-in-windows-b58704b2-f53a-4b82-7bc1-80f9994725bf#:~:text=To%20share%20a%20file%20or,users%20access%20to%20the%20file.) or by using external drives. You can also use an external SFTP server.
+```
+ADMIN_PASSWORD=et-langt-og-unikt-passord
+```
 
-## Remote access (SFTP)
-For external connections I recommend configuring a protected SFTP server, for example https://hub.docker.com/r/atmoz/sftp.
+Alle sider og API-kall i admin krever da innlogging via en egen innloggingsside, og det vises en **Logg ut**-knapp i menyen. Innloggingen varer i 7 dager, og etter fem feil passord blir innloggingen sperret i fem minutter. Er variabelen tom eller ikke satt, er innlogging slått av.
+
+Bruk HTTPS i NPM slik at passordet ikke sendes ukryptert. Økter signeres med en nøkkel som lagres i `secret.key` i datavolumet; sett `SECRET_KEY` hvis du heller vil styre den selv. Skift passord eller nøkkel for å logge ut alle.
+
+## Offentlig side
+
+Spill og filer på den offentlige siden kan lastes ned av alle som når tjenesten. Bruk NPM eller brannmur for å begrense frontend dersom den bare skal brukes på skolens nettverk.
+
+## Nginx Proxy Manager
+
+Bruk [Nginx Proxy Manager](https://nginxproxymanager.com/) for proxy-adresser og tilgangsregler. Proxy admin til `http://admin:8081` og velg en Access List som passer organisasjonens behov. Test regelen både fra et nettverk med og uten tilgang.
+
+Hvis du bruker IP-regler, er de vanlige private IPv4-områdene:
+
+```
+192.168.0.0/16
+172.16.0.0/12
+10.0.0.0/8
+```
+
+## Filtilgang
+
+Spill kan lastes opp gjennom admin-appen eller legges i en administrert mappe. For direkte filtilgang kan du bruke nettverksdeling, ekstern disk eller en beskyttet SFTP-tjeneste. Ikke eksponer fillageret eller admin-porten direkte på internett.

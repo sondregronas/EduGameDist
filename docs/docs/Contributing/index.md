@@ -4,4 +4,4 @@ Improvements are very welcome, feel free to open a pull request or issue. The fr
 Keep in mind this project is aimed towards teachers, so it should be easy to use and understand. Performance or fancy features are not a priority, simplicity is.
 
 ## About the modules
-The project is built on Node.js, and uses Express for the backend and Pug for the frontend. The database is SQLite, which for now is managed using NocoDB (which is a web-based database manager). The reason for this is that it is easy to use, and it is relatively easy for anyone to manage the database using the web interface.
+The project uses Python, Flask, SQLAlchemy, and SQLite. It runs as two separate Flask apps: a read-only public website and an admin interface. The admin interface writes game metadata and file records to the shared database; Nginx Proxy Manager is responsible for access control.

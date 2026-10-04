@@ -1,83 +1,40 @@
-let games = document.querySelectorAll('[id=game-grid-card]')
+(() => {
+  const grid = document.getElementById('game-grid')
+  const search = document.getElementById('search')
+  if (!grid || !search) return
 
-// Search bar, search by title or category
-document.getElementById('search').addEventListener('input', (e) => {
-    let search = e.target.value.toLowerCase()
-    Array.from(games).forEach((game) => {
-        let title = game.getElementsByClassName('game-title')[0].innerHTML.toLowerCase()
-        let categories = []
-        // Add all categories to array
-        game.querySelectorAll('[class=game-card-category]').forEach(category => {
-            categories.push(category.innerHTML.toLowerCase())
-        })
-        if (title.includes(search) || categories.some(category => category.startsWith(search))) {
-            game.classList.remove('hidden-search')
-        } else {
-            game.classList.add('hidden-search')
-        }
-    })
-    checkAllHidden()
-})
+  const cards = [...grid.querySelectorAll('a.game-card')]
+  const chips = [...document.querySelectorAll('.filter-chip')]
+  const counter = document.getElementById('result-count')
+  const empty = document.getElementById('no-results')
+  let platform = null
 
-// Filter by platform
-document.querySelectorAll('.filterBtn').forEach((btn) => {
-    btn.addEventListener('change', (e) => {
-        let platform = btn.className.split(' ')[2]
-        Array.from(games).forEach((game) => {
-            game.classList.remove('hidden-platform')
-        })
-        // Hide games for other platforms
-        if (btn.checked) {
-            Array.from(games).forEach((game) => {
-                if (!game.getElementsByClassName(platform).length) {
-                    game.classList.add('hidden-platform')
-                }
-            })
-        }
-        // Add radio behaviour to filter buttons
-        document.querySelectorAll('.filterBtn').forEach((btn2) => {
-            if (btn2 !== btn) {
-                btn2.checked = false
-            }
-        })
-        checkAllHidden()
+  chips.forEach((chip) => {
+    const available = cards.some((card) => card.dataset.platforms.split(' ').includes(chip.dataset.platform))
+    chip.hidden = !available
+    chip.addEventListener('click', () => {
+      platform = platform === chip.dataset.platform ? null : chip.dataset.platform
+      chips.forEach((other) => other.setAttribute('aria-pressed', String(other.dataset.platform === platform)))
+      apply()
     })
-})
+  })
 
-// Only display platform buttons if there are games for that platform
-document.querySelectorAll('.filterBtn').forEach((btn) => {
-    let platform = btn.className.split(' ')[2]
-    Array.from(games).forEach((game) => {
-        if (game.getElementsByClassName(platform).length > 0) {
-            btn.style.display = 'inline-block'
-        }
+  function apply() {
+    const query = search.value.trim().toLowerCase()
+    let shown = 0
+    cards.forEach((card) => {
+      const matchesText = !query ||
+        card.dataset.title.includes(query) ||
+        card.dataset.categories.split('|').some((category) => category.includes(query))
+      const matchesPlatform = !platform || card.dataset.platforms.split(' ').includes(platform)
+      const visible = matchesText && matchesPlatform
+      card.classList.toggle('is-hidden', !visible)
+      if (visible) shown++
     })
-})
+    counter.textContent = cards.length ? `${shown} av ${cards.length} spill` : ''
+    empty.hidden = shown > 0 || cards.length === 0
+  }
 
-// If all games are hidden, display a message
-function checkAllHidden(){
-    let hidden = []
-    Array.from(games).forEach((game) => {
-        if (game.classList.contains('hidden-platform')) {
-            hidden.push(game)
-        }
-        else if (game.classList.contains('hidden-search')) {
-            hidden.push(game)
-        }
-    })
-    if (hidden.length === games.length) {
-        document.getElementById('no-results').style.display = 'block'
-    } else {
-        document.getElementById('no-results').style.display = 'none'
-    }
-}
-
-// check state of checkboxes and search bar on page load
-window.onload = function() {
-    document.querySelectorAll('.filterBtn').forEach((btn) => {
-        if (btn.checked) {
-            btn.dispatchEvent(new Event('change'))
-        }
-    })
-    document.getElementById('search').dispatchEvent(new Event('input'))
-}
+  search.addEventListener('input', apply)
+  apply()
+})()

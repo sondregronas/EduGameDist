@@ -1,5 +1,5 @@
 # Example terms and conditions regarding use of games within classrooms
-An example terms & conditions document (in Norwegian) is included and can be found here: https://github.com/sondregronas/EduGameDist/blob/main/src/views/cfg/tc.pug.
+An example terms & conditions document (in Norwegian) is included in [`src/templates/terms.html`](https://github.com/sondregronas/EduGameDist/blob/main/src/templates/terms.html).
 
 Be sure to modify this to fit your needs or requirements.
 

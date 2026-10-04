@@ -1,16 +1,10 @@
-FROM node:lts-slim
-ENV NODE_ENV=production
-ENV DOCKER=true
-ENV TITLE=Game\ Server
-
-RUN apt-get update && apt-get install -y python3 build-essential && rm -rf /var/lib/apt/lists/*
-
+FROM python:3.14-slim
+ENV PYTHONUNBUFFERED=1
+ENV DATA_DIR=/app/data
 WORKDIR /app
+COPY src/requirements.txt .
+RUN pip install --no-cache-dir -r requirements.txt
 COPY src/. .
-COPY src/. /app.defaults
-
-RUN npm install --production
-
-EXPOSE 80/tcp
-
-CMD [ "node", "server.js" ]
+RUN mkdir -p /app/data/uploads /app/data/upload-tmp
+EXPOSE 80/tcp 8081/tcp
+CMD ["gunicorn", "--worker-class", "gthread", "--workers", "2", "--threads", "4", "--timeout", "0", "--bind", "0.0.0.0:80", "app:create_public_app()"]

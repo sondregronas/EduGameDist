@@ -18,7 +18,6 @@ on:
       - 'README.md'
       - 'CONTRIBUTING.md'
       - 'docker-compose.yml'
-      - 'src/demo.js'
       - 'src/demo-img/**'
       - 'docs/**'
 
@@ -31,40 +30,54 @@ jobs:
     if: ${{ !contains(github.event.head_commit.message, '[skip ci]') }}
     steps:
       - name: Checkout repository
-        uses: actions/checkout@v3
+        uses: actions/checkout@v7
+
+      - name: Set up Python
+        uses: actions/setup-python@v7
+        with:
+          python-version: '3.14'
+
+      - name: Install application dependencies
+        run: python -m pip install -r src/requirements.txt
+
+      - name: Run application tests
+        run: python -m unittest discover -s src/tests -v
 
       - name: Prepare
         id: prepare
         run: |
           if [[ $GITHUB_REF == refs/tags/* ]]; then
-            echo ::set-output name=tag::${GITHUB_REF#refs/tags/}
+            tag=${GITHUB_REF#refs/tags/}
           elif [[ $GITHUB_REF == refs/heads/main ]]; then
-            echo ::set-output name=tag::latest
+            tag=latest
           else
-            echo ::set-output name=tag::${GITHUB_REF#refs/heads/}
+            tag=${GITHUB_REF#refs/heads/}
           fi
           if [[ $GITHUB_REF == refs/tags/*-beta ]]; then
-            echo ::set-output name=branch::beta
+            branch=beta
           elif [[ $GITHUB_REF == refs/tags/* ]]; then
-            echo ::set-output name=branch::main
+            branch=main
           else
-            echo ::set-output name=branch::${GITHUB_REF#refs/heads/}
+            branch=${GITHUB_REF#refs/heads/}
           fi
-          echo ::set-output name=commit::${GITHUB_SHA}
-          echo ::set-output name=build_date::$(date -u +'%Y-%m-%dT%H:%M:%SZ')
-          echo ::set-output name=docker_platforms::${{ env.platforms }}
-          echo ::set-output name=docker_image::${{ env.docker-container }}
+          {
+            echo "tag=$tag"
+            echo "branch=$branch"
+            echo "commit=${GITHUB_SHA}"
+            echo "build_date=$(date -u +'%Y-%m-%dT%H:%M:%SZ')"
+            echo "docker_platforms=${{ env.platforms }}"
+            echo "docker_image=${{ env.docker-container }}"
+          } >> "$GITHUB_OUTPUT"
+
       - name: Set Up QEMU
-        uses: docker/setup-qemu-action@v2
+        uses: docker/setup-qemu-action@v4
 
       - name: Set up Docker Buildx
-        uses: docker/setup-buildx-action@v2
+        uses: docker/setup-buildx-action@v4
         id: buildx
-        with:
-          version: latest
 
       - name: Cache Docker Layers
-        uses: actions/cache@v3
+        uses: actions/cache@v6
         with:
           path: /tmp/.buildx-cache
           key: ${{ runner.os }}-buildx-${{ github.sha }}
@@ -72,14 +85,14 @@ jobs:
             ${{ runner.os }}-buildx-
       - name: Log into registry GHCR
         if: success()
-        uses: docker/login-action@v2
+        uses: docker/login-action@v4
         with:
           registry: ghcr.io
           username: ${{ github.actor }}
           password: ${{ secrets.GITHUB_TOKEN }}
 
       - name: Docker Build and Push
-        uses: docker/build-push-action@v3
+        uses: docker/build-push-action@v7
         if: success()
         with:
           context: .

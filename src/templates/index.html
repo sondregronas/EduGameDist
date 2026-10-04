@@ -1,0 +1,105 @@
+{% extends "base.html" %}
+{% from "_macros.html" import icon %}
+{% block head %}
+  <meta property="og:title" content="{{ site_title }}">
+  <meta property="og:type" content="website">
+  <script src="/assets/js/search.js" defer></script>
+  {% if admin %}<script src="/assets/js/admin.js" defer></script>{% endif %}
+{% endblock %}
+{% block content %}
+  <section class="hero">
+    <h1>{{ site_title }}</h1>
+    <p>Get your game on</p>
+  </section>
+
+  <div class="toolbar" id="filter">
+    <label class="search-box">
+      {{ icon('search') }}
+      <input type="search" id="search" placeholder="Søk etter spill eller kategori" aria-label="Søk etter spill" autocomplete="off">
+    </label>
+    <div class="filter-chips" role="group" aria-label="Filtrer på plattform">
+      {% for key, label in [('browser', 'Nettleser'), ('windows', 'Windows'), ('mac', 'Mac'), ('linux', 'Linux'), ('android', 'Android')] %}
+        <button type="button" class="filter-chip" data-platform="{{ key }}" aria-pressed="false" hidden>{{ icon(key) }}<span>{{ label }}</span></button>
+      {% endfor %}
+    </div>
+    <span class="result-count" id="result-count" aria-live="polite"></span>
+  </div>
+
+  {% if admin and remote_covers %}
+    <div class="notice notice-info" id="localize-notice">
+      {{ icon('info') }}
+      <span>{{ remote_covers }} omslagsbilde{{ 'r' if remote_covers != 1 }} er lenker til andre nettsteder.</span>
+      <button type="button" class="btn btn-small" id="localize-covers">{{ icon('download') }}Last ned til serveren</button>
+    </div>
+  {% endif %}
+
+  <div id="no-results" hidden>
+    <div class="empty-emoji">😔</div>
+    <p>Her var det tomt, gitt!</p>
+  </div>
+
+  <div id="game-grid">
+    {% if admin %}
+      <button type="button" class="game-card add-card" id="add-game">
+        <span class="add-plus">{{ icon('plus') }}</span>
+        <span>Legg til spill</span>
+      </button>
+    {% endif %}
+    {% for game in games %}
+      <a class="game-card" href="/{{ game.slug }}"
+         data-title="{{ game.title|lower }}"
+         data-categories="{{ game.category|join('|')|lower }}"
+         data-platforms="{{ game.platforms|join(' ') }}">
+        <div class="card-cover">
+          {% if game.cover %}<img src="{{ game.cover }}" alt="" loading="lazy" width="460" height="215">
+          {% else %}<div class="cover-placeholder">{{ icon('gamepad') }}</div>{% endif %}
+          <div class="card-badges">
+            {% if game.players %}<span class="badge">{{ icon('user' if game.players == '1' else 'users') }}{{ game.players }}</span>{% endif %}
+            {% if game.ttb %}<span class="badge">{{ icon('clock') }}{{ game.ttb }}</span>{% endif %}
+          </div>
+        </div>
+        <div class="card-body">
+          <h2 class="card-title">{{ game.title }}</h2>
+          <div class="card-footer">
+            <div class="card-tags">
+              {% for category in game.category[:3] %}<span class="tag" style="--h: {{ category|hue }}">{{ category }}</span>{% endfor %}
+            </div>
+            <div class="card-platforms" aria-label="Plattformer">
+              {% for platform in game.platforms %}<span title="{{ platform|capitalize }}">{{ icon(platform) }}</span>{% endfor %}
+            </div>
+          </div>
+        </div>
+      </a>
+    {% endfor %}
+  </div>
+
+  {% if admin %}
+    <dialog id="add-dialog" class="dialog">
+      <form id="add-form" method="dialog" class="dialog-form" autocomplete="off">
+        <header class="dialog-head">
+          <h2>{{ icon('plus') }}Legg til spill</h2>
+          <button type="button" class="icon-btn" data-close aria-label="Lukk">{{ icon('close') }}</button>
+        </header>
+        <div class="steam-row">
+          <label class="field">
+            <span>Steam-lenke, app-ID eller spillnavn</span>
+            <input id="add-steam" placeholder="https://store.steampowered.com/app/…">
+          </label>
+          <button type="button" class="btn" id="add-steam-fetch">{{ icon('wand') }}Hent fra Steam</button>
+        </div>
+        <p class="hint">Fyller automatisk ut tittel, beskrivelse, utvikler og omslagsbilde, og leter etter GOG-, itch.io- og Humble-lenker.</p>
+        <div class="add-preview" id="add-preview" hidden><img alt=""></div>
+        <label class="field"><span>Tittel</span><input id="add-title" required maxlength="250"></label>
+        <label class="field"><span>Beskrivelse</span><textarea id="add-description" rows="4"></textarea></label>
+        <label class="field"><span>Utvikler</span><input id="add-developer"></label>
+        <label class="field"><span>Utviklerens nettsted</span><input id="add-developer-link" type="url" placeholder="https://…"></label>
+        <div id="add-links" class="link-pills"></div>
+        <p class="form-error" id="add-error" role="alert" hidden></p>
+        <footer class="dialog-actions">
+          <button type="button" class="btn btn-ghost" data-close>Avbryt</button>
+          <button type="submit" class="btn btn-primary" id="add-submit">{{ icon('check') }}Opprett og legg til filer</button>
+        </footer>
+      </form>
+    </dialog>
+  {% endif %}
+{% endblock %}
