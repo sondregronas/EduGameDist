@@ -11,7 +11,7 @@
   </section>
 
   <nav class="settings-jump" aria-label="Innstillinger">
-    <a href="#site">Nettstedet</a><a href="#frontpage">Forsiden</a><a href="#menu">Meny</a><a href="#pages">Sider</a><a href="#categories">Kategorier</a><a href="#password">Passord</a><a href="#github">GitHub-innlogging</a><a href="#forward">Snarvei</a>
+    <a href="#site">Nettstedet</a><a href="#frontpage">Forsiden</a><a href="#menu">Meny</a><a href="#pages">Sider</a><a href="#categories">Kategorier</a><a href="#password">Passord</a><a href="#github">GitHub-innlogging</a>
   </nav>
 
   <form id="settings-form" class="settings-form" autocomplete="off">
@@ -73,6 +73,31 @@
 
   <section class="settings-card" id="password">
     <header>{{ icon('lock') }}<h2>Passord for admin</h2></header>
+    {% if password.force_env %}
+      <div class="notice notice-warn">{{ icon('lock') }}<span>
+        <code>FORCE_ENV_PASSWORD</code> er slått på, så bare passordet i miljøvariabelen <code>ADMIN_PASSWORD</code> brukes, og det kan ikke endres her.
+        {% if password.stored_ignored %}Passordet som er lagret under Innstillinger, brukes ikke så lenge variabelen er satt.{% endif %}
+        {% if not password.source %}<code>ADMIN_PASSWORD</code> er ikke satt, så det finnes ikke noe passord.{% endif %}
+      </span></div>
+    {% endif %}
+    {% if password.source %}
+      <div class="toggle-row">
+        <label class="switch">
+          <input type="checkbox" id="password-login"{% if password.login_setting or password.force_login %} checked{% endif %}{% if password.force_login or (password.login_setting and not password.github_session) %} disabled{% endif %}>
+          <span class="switch-track" aria-hidden="true"></span>
+          <span class="switch-text"><b>Tillat innlogging med passord</b>
+            <small>
+              {% if password.force_login %}Alltid på, fordi <code>FORCE_PASSWORD_LOGIN</code> er satt.
+              {% elif not password.login_setting and password.login_allowed %}Slått av, men på likevel fordi GitHub-innloggingen ikke er satt opp. Slik blir ingen låst ute.
+              {% elif not password.login_setting %}Av: bare GitHub-brukerne kan logge inn. Passordet slås på igjen av seg selv hvis GitHub-innloggingen ikke lenger er satt opp.
+              {% elif password.github_session %}Slå av hvis bare GitHub-brukerne skal kunne logge inn. Alle som er logget inn med passordet, blir logget ut.
+              {% else %}Kan slås av når du er logget inn med GitHub, så du vet at GitHub-innloggingen virker.{% endif %}
+            </small>
+          </span>
+        </label>
+      </div>
+    {% endif %}
+    {% if not password.force_env %}
     <p class="hint">
       {% if password.source == 'stored' %}
         Admin bruker passordet som er lagret her.
@@ -99,6 +124,7 @@
         <button type="submit" class="btn btn-primary">{{ icon('check') }}{% if password.source %}{{ 'Sett nytt passord' if password.github_session else 'Endre passord' }}{% else %}{{ 'Lagre passord' if password.github_active else 'Slå på innlogging' }}{% endif %}</button>
       </div>
     </form>
+    {% endif %}
   </section>
 
   <section class="settings-card" id="github">
@@ -140,13 +166,6 @@
     </div>
     <label class="field" id="github-current-field" hidden><span>Endringer her bekreftes med admin-passordet</span><input type="password" id="github-current" autocomplete="current-password"></label>
     <p class="hint" id="github-auth-hint"></p>
-  </section>
-
-  <section class="settings-card" id="forward" data-public="{{ public_base }}">
-    <header>{{ icon('external') }}<h2>Snarvei til admin</h2><span class="status-pill" id="forward-state"></span></header>
-    <p class="hint">Nettlesere som har vært innom admin, sendes rett hit når de åpner den offentlige nettsiden (<code>{{ public_base }}</code>), til samme side. Elever og andre som aldri har brukt admin, merker ingenting. Vil du se den offentlige nettsiden selv, bruker du <b>Åpne nettsiden</b> i menyen.</p>
-    <p class="hint" id="forward-hint"></p>
-    <div class="settings-actions"><button type="button" class="btn" id="forward-toggle"></button></div>
   </section>
 
   <script type="application/json" id="settings-data">{{ data|tojson }}</script>

@@ -26,12 +26,16 @@ services:
       # Default site title. It can be changed under Settings in admin.
       - TITLE=Spillserver
       - DATA_DIR=/app/data
-      # Address of the public site: used by "Åpne nettsiden" and to send admins from the public site to admin.
       - PUBLIC_URL=${PUBLIC_URL:-http://localhost/}
       # Admin password. Empty = no login (rely on NPM access control).
       # A password saved under Settings in admin takes precedence over this one.
       # GitHub login for chosen GitHub users is set up under Settings as well.
       - ADMIN_PASSWORD=${ADMIN_PASSWORD:-}
+      # true = logging in with the password is always allowed, even if it is turned off under Settings.
+      - FORCE_PASSWORD_LOGIN=${FORCE_PASSWORD_LOGIN:-false}
+      # true = only ADMIN_PASSWORD is used. A password saved under Settings is ignored and cannot be
+      # changed there. Use it to get back in if the saved password is lost.
+      - FORCE_ENV_PASSWORD=${FORCE_ENV_PASSWORD:-false}
     healthcheck:
       test:
         - CMD

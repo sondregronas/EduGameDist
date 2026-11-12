@@ -44,7 +44,7 @@ PLATFORMS = {
 }
 RESERVED_SLUGS = {
     "api", "assets", "files", "legacy-covers", "health", "install", "vilkar",
-    "settings", "login", "logout", "logo", "admin-forward",
+    "settings", "login", "logout", "logo",
 }
 WEEKDAYS = ("mandag", "tirsdag", "onsdag", "torsdag", "fredag", "lørdag", "søndag")
 MONTHS = (
