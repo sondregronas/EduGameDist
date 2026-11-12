@@ -20,9 +20,9 @@
         {% endfor %}
         {% if admin %}
           <a href="/settings" title="Innstillinger">{{ icon('cog') }}<span>Innstillinger</span></a>
-          <a href="{{ public_url }}" target="_blank" rel="noopener noreferrer" title="Åpne nettsiden">{{ icon('external') }}<span>Åpne nettsiden</span></a>
+          <a href="{{ public_view_url }}" target="_blank" rel="noopener noreferrer" title="Åpne nettsiden">{{ icon('external') }}<span>Åpne nettsiden</span></a>
         {% endif %}
-        {% if auth_enabled and logged_in %}<form method="post" action="/logout" class="logout-form"><button type="submit" class="nav-button" title="Logg ut">{{ icon('logout') }}<span>Logg ut</span></button></form>{% endif %}
+        {% if auth_enabled and logged_in %}<form method="post" action="/logout" class="logout-form"><button type="submit" class="nav-button" title="Logg ut{% if github_user %} (@{{ github_user.login }}){% endif %}">{% if github_user %}<img class="nav-avatar" src="https://avatars.githubusercontent.com/u/{{ github_user.id }}?s=64" alt="" width="22" height="22">{% else %}{{ icon('logout') }}{% endif %}<span>Logg ut</span></button></form>{% endif %}
       </nav>
       <div class="theme-switch" role="radiogroup" aria-label="Tema">
         <label title="Mørkt tema"><input type="radio" name="theme" value="dark" aria-label="Mørkt">{{ icon('moon') }}</label>

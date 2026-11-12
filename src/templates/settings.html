@@ -11,7 +11,7 @@
   </section>
 
   <nav class="settings-jump" aria-label="Innstillinger">
-    <a href="#site">Nettstedet</a><a href="#frontpage">Forsiden</a><a href="#menu">Meny</a><a href="#pages">Sider</a><a href="#categories">Kategorier</a><a href="#password">Passord</a>
+    <a href="#site">Nettstedet</a><a href="#frontpage">Forsiden</a><a href="#menu">Meny</a><a href="#pages">Sider</a><a href="#categories">Kategorier</a><a href="#password">Passord</a><a href="#github">GitHub-innlogging</a><a href="#forward">Snarvei</a>
   </nav>
 
   <form id="settings-form" class="settings-form" autocomplete="off">
@@ -76,25 +76,80 @@
     <p class="hint">
       {% if password.source == 'stored' %}
         Admin bruker passordet som er lagret her.
-        {% if password.env_set %}Fjerner du det, brukes passordet fra miljøvariabelen <code>ADMIN_PASSWORD</code> igjen.{% else %}Fjerner du det, slås innloggingen av, siden <code>ADMIN_PASSWORD</code> ikke er satt.{% endif %}
+        {% if password.env_set %}Fjerner du det, brukes passordet fra miljøvariabelen <code>ADMIN_PASSWORD</code> igjen.{% elif password.github_active %}Fjerner du det, kan bare GitHub-brukerne nedenfor logge inn, siden <code>ADMIN_PASSWORD</code> ikke er satt.{% else %}Fjerner du det, slås innloggingen av, siden <code>ADMIN_PASSWORD</code> ikke er satt.{% endif %}
       {% elif password.source == 'env' %}
         Admin bruker passordet fra miljøvariabelen <code>ADMIN_PASSWORD</code>. Et passord du lagrer her, brukes i stedet.
+      {% elif password.github_active %}
+        Det er ikke satt noe passord, så bare GitHub-brukerne nedenfor kan logge inn. Lagrer du et passord her, kan man også logge inn med det.
       {% else %}
         Innlogging er slått av. Lagrer du et passord her, må alle logge inn for å bruke admin.
       {% endif %}
-      {% if password.source %}Alle andre blir logget ut når passordet endres.{% endif %}
+      {% if password.source %}Alle andre som er logget inn med passordet, blir logget ut når det endres.{% endif %}
     </p>
-    <form id="password-form" class="password-form" data-source="{{ password.source or '' }}" data-env="{{ 'true' if password.env_set else 'false' }}">
-      {% if password.source %}<label class="field"><span>Nåværende passord</span><input type="password" id="password-current" autocomplete="current-password" required></label>{% endif %}
+    {% if password.source and password.github_session %}
+      <div class="notice notice-info">{{ icon('github') }}<span>Du er logget inn med GitHub, så du kan sette et nytt passord uten å kjenne det gamle. Skriv <code>{{ password.reset_word }}</code> i det nederste feltet for å bekrefte.</span></div>
+    {% endif %}
+    <form id="password-form" class="password-form" data-source="{{ password.source or '' }}" data-env="{{ 'true' if password.env_set else 'false' }}" data-github="{{ 'true' if password.github_active else 'false' }}" data-reset-word="{{ password.reset_word }}">
+      {% if password.source and not password.github_session %}<label class="field"><span>Nåværende passord</span><input type="password" id="password-current" autocomplete="current-password" required></label>{% endif %}
       <label class="field"><span>Nytt passord (minst 8 tegn)</span><input type="password" id="password-new" autocomplete="new-password" minlength="8" required></label>
       <label class="field"><span>Gjenta nytt passord</span><input type="password" id="password-repeat" autocomplete="new-password" minlength="8" required></label>
+      {% if password.source and password.github_session %}<label class="field"><span>Skriv {{ password.reset_word }} for å bekrefte</span><input id="password-confirm" autocomplete="off" spellcheck="false" autocapitalize="characters" placeholder="{{ password.reset_word }}" required></label>{% endif %}
       <div class="settings-actions">
         {% if password.source == 'stored' %}<button type="button" class="btn btn-danger" id="password-remove">{{ icon('trash') }}Fjern lagret passord</button>{% endif %}
-        <button type="submit" class="btn btn-primary">{{ icon('check') }}{{ 'Endre passord' if password.source else 'Slå på innlogging' }}</button>
+        <button type="submit" class="btn btn-primary">{{ icon('check') }}{% if password.source %}{{ 'Sett nytt passord' if password.github_session else 'Endre passord' }}{% else %}{{ 'Lagre passord' if password.github_active else 'Slå på innlogging' }}{% endif %}</button>
       </div>
     </form>
   </section>
 
+  <section class="settings-card" id="github">
+    <header>{{ icon('github') }}<h2>GitHub-innlogging</h2><span class="status-pill" id="github-state"></span></header>
+    <p class="hint">La utvalgte GitHub-brukere logge inn i admin med GitHub-kontoen sin, i tillegg til eller i stedet for passordet. Innloggingen slås på når GitHub-appen er lagret og minst én bruker har fått tilgang.</p>
+    <details class="setup-guide" id="github-guide">
+      <summary>Slik lager du GitHub-appen</summary>
+      <ol class="steps">
+        <li>Gå til <a href="https://github.com/settings/applications/new" target="_blank" rel="noopener noreferrer">github.com/settings/applications/new</a> (eller <b>Settings → Developer settings → OAuth Apps</b> i en organisasjon) og lag en ny OAuth App.</li>
+        <li>Gi den et navn, og bruk adressene under som <b>Homepage URL</b> og <b>Authorization callback URL</b>.
+          <div class="copy-rows">
+            <div class="copy-row"><span>Homepage URL</span><code id="github-homepage"></code><button type="button" class="icon-btn" data-copy="github-homepage" title="Kopier" aria-label="Kopier Homepage URL">{{ icon('copy') }}</button></div>
+            <div class="copy-row"><span>Callback URL</span><code id="github-callback"></code><button type="button" class="icon-btn" data-copy="github-callback" title="Kopier" aria-label="Kopier callback URL">{{ icon('copy') }}</button></div>
+          </div>
+        </li>
+        <li>Trykk <b>Register application</b>, kopier <b>Client ID</b>, trykk <b>Generate a new client secret</b> og lim inn begge her.</li>
+      </ol>
+    </details>
+    <form id="github-form" class="password-form" autocomplete="off">
+      <label class="field"><span>Client ID</span><input id="github-client-id" maxlength="200" spellcheck="false" placeholder="Ov23li…"></label>
+      <div class="field">
+        <span>Client secret</span>
+        <div class="secret-saved" id="github-secret-saved" hidden>{{ icon('key') }}<span>Lagret, slutter på <code id="github-secret-hint"></code></span><button type="button" class="btn btn-small btn-ghost" id="github-secret-replace">{{ icon('sync') }}Bytt</button></div>
+        <input id="github-client-secret" maxlength="200" spellcheck="false" autocomplete="off" placeholder="Lim inn hemmeligheten fra GitHub">
+        <p class="hint">Hemmeligheten vises bare mens du limer den inn. Når den er lagret, sendes den aldri tilbake til nettleseren, og den kan bare byttes ut.</p>
+      </div>
+      <div class="settings-actions">
+        <button type="button" class="btn btn-danger" id="github-remove" hidden>{{ icon('trash') }}Fjern GitHub-appen</button>
+        <button type="submit" class="btn btn-primary">{{ icon('save') }}Lagre GitHub-appen</button>
+      </div>
+    </form>
+    <div class="github-users">
+      <span class="field-label">Brukere med tilgang</span>
+      <ul class="user-list" id="github-users"></ul>
+      <form id="github-user-form" class="inline-form" autocomplete="off">
+        <input class="ghost" id="github-user-login" maxlength="100" spellcheck="false" placeholder="GitHub-brukernavn, @navn eller lenke til profilen" aria-label="GitHub-brukernavn">
+        <button type="submit" class="btn btn-small">{{ icon('plus') }}Gi tilgang</button>
+      </form>
+    </div>
+    <label class="field" id="github-current-field" hidden><span>Endringer her bekreftes med admin-passordet</span><input type="password" id="github-current" autocomplete="current-password"></label>
+    <p class="hint" id="github-auth-hint"></p>
+  </section>
+
+  <section class="settings-card" id="forward" data-public="{{ public_base }}">
+    <header>{{ icon('external') }}<h2>Snarvei til admin</h2><span class="status-pill" id="forward-state"></span></header>
+    <p class="hint">Nettlesere som har vært innom admin, sendes rett hit når de åpner den offentlige nettsiden (<code>{{ public_base }}</code>), til samme side. Elever og andre som aldri har brukt admin, merker ingenting. Vil du se den offentlige nettsiden selv, bruker du <b>Åpne nettsiden</b> i menyen.</p>
+    <p class="hint" id="forward-hint"></p>
+    <div class="settings-actions"><button type="button" class="btn" id="forward-toggle"></button></div>
+  </section>
+
   <script type="application/json" id="settings-data">{{ data|tojson }}</script>
+  <script type="application/json" id="github-data">{{ github|tojson }}</script>
 </article>
 {% endblock %}

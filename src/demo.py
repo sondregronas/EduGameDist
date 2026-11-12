@@ -52,6 +52,7 @@ SAMPLES = [
         "browser_url": "https://anansigames.itch.io/oslo2084",
         "links": ["https://anansigames.itch.io/oslo2084"],
         "cover": "oslo2084.png",
+        "featured": "Perfekt til samfunnsfag: elevene møter demokratiske dilemmaer underveis.",
         "categories": ["Demokrati", "Norsk"],
         "players": "1",
         "time": "45 min",
@@ -123,6 +124,9 @@ def main():
                     players=sample["players"],
                     time=sample["time"],
                     slug=slug,
+                    # The demo is static, so its "Ukens spill" has no end date.
+                    featured_since="2026-01-01T00:00:00+00:00" if "featured" in sample else None,
+                    featured_note=sample.get("featured"),
                 )
                 session.add(game)
                 session.flush()

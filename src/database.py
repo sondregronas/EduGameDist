@@ -1,7 +1,7 @@
 import base64
 import json
 import re
-from datetime import datetime, timezone
+from datetime import date, datetime, timedelta, timezone
 from pathlib import Path
 from urllib.parse import unquote, urlparse
 
@@ -44,8 +44,15 @@ PLATFORMS = {
 }
 RESERVED_SLUGS = {
     "api", "assets", "files", "legacy-covers", "health", "install", "vilkar",
-    "settings", "login", "logout", "logo",
+    "settings", "login", "logout", "logo", "admin-forward",
 }
+WEEKDAYS = ("mandag", "tirsdag", "onsdag", "torsdag", "fredag", "lørdag", "søndag")
+MONTHS = (
+    "januar", "februar", "mars", "april", "mai", "juni",
+    "juli", "august", "september", "oktober", "november", "desember",
+)
+MAX_FEATURED_DAYS = 366
+MAX_FEATURED_NOTE = 300
 LEGACY_PLATFORMS = {
     "windows_download": "windows",
     "mac_download": "mac",
@@ -88,6 +95,11 @@ class Game(Base):
     steam_app_id: Mapped[str | None] = mapped_column("SteamAppId", String, default=None)
     slug: Mapped[str | None] = mapped_column("Slug", String, default=None)
     hidden: Mapped[bool] = mapped_column("Hidden", Boolean, default=False, server_default="0")
+    # "Ukens spill": when the game was pinned (null = not pinned), the last day it is shown (null = no end
+    # date) and an optional note on why it was picked.
+    featured_since: Mapped[str | None] = mapped_column("FeaturedSince", String, default=None)
+    featured_until: Mapped[str | None] = mapped_column("FeaturedUntil", String, default=None)
+    featured_note: Mapped[str | None] = mapped_column("FeaturedNote", Text, default=None)
     categories: Mapped[list["GameCategory"]] = relationship(
         back_populates="game",
         cascade="all, delete-orphan",
@@ -274,6 +286,9 @@ def initialize_db(engine):
             ("SteamAppId", "TEXT"),
             ("Slug", "TEXT"),
             ("Hidden", "BOOLEAN NOT NULL DEFAULT 0"),
+            ("FeaturedSince", "TEXT"),
+            ("FeaturedUntil", "TEXT"),
+            ("FeaturedNote", "TEXT"),
         ):
             if column.lower() not in columns:
                 connection.execute(text(f'ALTER TABLE games ADD COLUMN "{column}" {definition}'))
@@ -421,6 +436,76 @@ def _store_label(value):
     return host.removeprefix("www.")
 
 
+def today():
+    """The current date (in the server's time zone, set with TZ). Tests replace this function."""
+    return date.today()
+
+
+def current_week():
+    return today().isocalendar().week
+
+
+def long_date(value):
+    """E.g. "søndag 15. november"."""
+    return f"{WEEKDAYS[value.weekday()]} {value.day}. {MONTHS[value.month - 1]}"
+
+
+def week_end(value, weeks_ahead=0):
+    """The Sunday that ends the week of `value`, or of a later week."""
+    return value + timedelta(days=6 - value.weekday(), weeks=weeks_ahead)
+
+
+def featured_options():
+    """The choices the pin dialog offers, worked out with the server's date."""
+    current = today()
+    this_sunday, next_sunday = week_end(current), week_end(current, 1)
+    return {
+        "today": current.isoformat(),
+        "max": (current + timedelta(days=MAX_FEATURED_DAYS)).isoformat(),
+        # From Saturday, "this week" is nearly over, so the dialog suggests next week instead.
+        "suggest": "next" if current.weekday() >= 5 else "this",
+        "this": {"until": this_sunday.isoformat(), "week": current.isocalendar().week, "text": long_date(this_sunday)},
+        "next": {"until": next_sunday.isoformat(), "week": next_sunday.isocalendar().week, "text": long_date(next_sunday)},
+        "max_note": MAX_FEATURED_NOTE,
+    }
+
+
+def featured_until(value):
+    """Validate the last day a pinned game is shown. None means it stays until it is unpinned."""
+    if value in (None, ""):
+        return None
+    try:
+        until = date.fromisoformat(str(value))
+    except ValueError:
+        raise ValueError("Sluttdatoen må være en gyldig dato.")
+    current = today()
+    if until < current:
+        raise ValueError("Sluttdatoen kan ikke være i fortiden.")
+    if until > current + timedelta(days=MAX_FEATURED_DAYS):
+        raise ValueError("Et spill kan festes i maks ett år om gangen.")
+    return until.isoformat()
+
+
+def featured_info(game):
+    """Whether a game is pinned as "Ukens spill" right now. Pins end on their own after the last day."""
+    if not game.featured_since:
+        return None
+    until = None
+    if game.featured_until:
+        try:
+            until = date.fromisoformat(game.featured_until)
+        except ValueError:
+            return None
+        if until < today():
+            return None
+    return {
+        "since": game.featured_since,
+        "until": until.isoformat() if until else "",
+        "until_text": long_date(until) if until else "",
+        "note": game.featured_note or "",
+    }
+
+
 def file_href(slug, file_id):
     return f"/{slug}/files/{file_id}"
 
@@ -483,6 +568,7 @@ def get_game(session, game_id):
         "steam_app_id": game.steam_app_id or "",
         "slug": game.slug,
         "hidden": bool(game.hidden),
+        "featured": featured_info(game),
         "files": files,
         "platforms": _platforms(game.browser_url, files),
     }

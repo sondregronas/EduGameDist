@@ -1,3 +1,42 @@
 {% macro icon(name, cls='') -%}
 <svg class="icon {{ cls }}" aria-hidden="true" focusable="false"><use href="/assets/img/icons.svg#{{ name }}"/></svg>
 {%- endmacro %}
+
+{# Admin: the star that opens the "Ukens spill" dialog for a game. #}
+{% macro star_button(game, cls='card-star', label=False) -%}
+<button type="button" class="{{ cls }}" aria-pressed="{{ 'true' if game.featured else 'false' }}" aria-haspopup="dialog"
+        data-feature='{{ {"id": game.id, "title": game.title, "featured": game.featured}|tojson }}'
+        title="{% if game.featured %}Ukens spill {{ ('til og med ' ~ game.featured.until_text) if game.featured.until_text else 'uten sluttdato' }}. Klikk for å endre.{% else %}Fest som ukens spill{% endif %}"
+        {% if not label %}aria-label="Ukens spill: {{ game.title }}"{% endif %}>{{ icon('star' if game.featured else 'star-outline') }}{% if label %}<span>Ukens spill</span>{% endif %}</button>
+{%- endmacro %}
+
+{# Admin: pin a game as "Ukens spill". admin.js opens it from the star buttons. #}
+{% macro feature_dialog(options) -%}
+<dialog id="feature-dialog" class="dialog">
+  <form id="feature-form" method="dialog" class="dialog-form">
+    <header class="dialog-head">
+      <h2>{{ icon('star') }}Ukens spill</h2>
+      <button type="button" class="icon-btn" data-close aria-label="Lukk">{{ icon('close') }}</button>
+    </header>
+    <p class="hint">Festede spill vises øverst på forsiden og får en stjerne i oversikten. De forsvinner derfra av seg selv etter siste dag.</p>
+    <p class="feature-game" id="feature-game"></p>
+    <fieldset class="choices">
+      <legend class="field-label">Hvor lenge?</legend>
+      <label class="choice"><input type="radio" name="feature-until" value="this"><span><b>Ut denne uken</b><small>Uke {{ options.this.week }}, til og med {{ options.this.text }}</small></span></label>
+      <label class="choice"><input type="radio" name="feature-until" value="next"><span><b>Ut neste uke</b><small>Uke {{ options.next.week }}, til og med {{ options.next.text }}</small></span></label>
+      <label class="choice"><input type="radio" name="feature-until" value="date"><span><b>Til og med en bestemt dag</b><input type="date" id="feature-date" min="{{ options.today }}" max="{{ options.max }}" aria-label="Siste dag"></span></label>
+      <label class="choice"><input type="radio" name="feature-until" value="none"><span><b>Til jeg fjerner det</b><small>Uten sluttdato</small></span></label>
+    </fieldset>
+    <label class="field"><span>Hvorfor akkurat dette spillet? (valgfritt, vises på forsiden)</span>
+      <textarea id="feature-note" rows="2" maxlength="{{ options.max_note }}" placeholder="F.eks. «Vi bruker det i samfunnsfag denne uken»"></textarea></label>
+    <p class="form-error" id="feature-error" role="alert" hidden></p>
+    <footer class="dialog-actions">
+      <button type="button" class="btn btn-danger" id="feature-remove">{{ icon('trash') }}Fjern fra ukens spill</button>
+      <span class="spacer"></span>
+      <button type="button" class="btn btn-ghost" data-close>Avbryt</button>
+      <button type="submit" class="btn btn-gold" id="feature-save">{{ icon('star') }}Fest</button>
+    </footer>
+  </form>
+</dialog>
+<script type="application/json" id="feature-data">{{ options|tojson }}</script>
+{%- endmacro %}

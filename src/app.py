@@ -12,6 +12,7 @@ import time
 import uuid
 import zlib
 from contextlib import contextmanager
+from datetime import datetime, timezone
 from pathlib import Path, PurePosixPath
 from urllib.error import HTTPError, URLError
 from urllib.parse import unquote, urljoin, urlparse
@@ -40,9 +41,14 @@ from database import (
     GameCategory,
     GameFile,
     GameStoreLink,
+    MAX_FEATURED_NOTE,
     PLATFORMS,
     all_categories,
     category_named,
+    current_week,
+    featured_info,
+    featured_options,
+    featured_until,
     file_href,
     get_game,
     initialize_db,
@@ -50,8 +56,9 @@ from database import (
     make_engine,
     unique_slug,
 )
+import forward
 import settings
-from auth import auth_enabled, configure_auth, logged_in, password_status
+from auth import auth_enabled, configure_auth, github_status, logged_in, password_status
 from pages import PAGES
 from richtext import page_sections, rich_text
 from stores import FetchError, discover_store_links, steam_search, store_catalog, store_info
@@ -433,6 +440,7 @@ def _open_app(mode, data_dir=None, games_dir=None):
             "admin": mode == "admin",
             "site": settings.site(),
             "public_url": current_app.config["PUBLIC_URL"],
+            "public_view_url": forward.public_view_url(current_app.config["PUBLIC_URL"]),
             "auth_enabled": mode == "admin" and auth_enabled(),
             "logged_in": mode == "admin" and logged_in(),
         }
@@ -523,6 +531,10 @@ def _open_app(mode, data_dir=None, games_dir=None):
         return render_template(
             "index.html",
             games=games,
+            # "Ukens spill" in the order they were pinned.
+            featured=sorted((game for game in games if game["featured"]), key=lambda game: game["featured"]["since"]),
+            week=current_week(),
+            feature_options=featured_options() if mode == "admin" else None,
             category_inventory=inventory if mode == "admin" else [],
             # The filter lists the categories in use, in the order chosen in admin.
             categories=[(category["name"], counts[category["id"]]) for category in inventory if category["id"] in counts],
@@ -566,6 +578,7 @@ def _open_app(mode, data_dir=None, games_dir=None):
                 "categories": all_categories(g.db),
             }
             context["upload_platforms"] = {key: PLATFORMS[key] for key in FILE_PLATFORMS}
+            context["feature_options"] = featured_options()
         return render_template("game.html", **context)
 
     @app.errorhandler(404)
@@ -575,6 +588,8 @@ def _open_app(mode, data_dir=None, games_dir=None):
     if mode == "admin":
         _configure_admin(app)
         _migrate_game_files(app)
+    else:
+        forward.configure_public(app)
     return app
 
 
@@ -620,12 +635,14 @@ def _client_game(game):
         "categories": game["categories"],
         "links": game["links"],
         "hidden": game["hidden"],
+        "featured": game["featured"],
         "files": [_file_view(item) for item in game["files"]],
     }
 
 
 def _configure_admin(app):
     configure_auth(app, Path(app.config["DATABASE_PATH"]).parent)
+    forward.configure_admin(app)
 
     @app.after_request
     def admin_security_headers(response):
@@ -663,6 +680,8 @@ def _configure_admin(app):
             pages=PAGES,
             default_title=current_app.config["TITLE"],
             password=password_status(),
+            github=github_status(),
+            public_base=forward.public_base(current_app.config["PUBLIC_URL"]),
         )
 
     @app.put("/api/settings")
@@ -810,6 +829,36 @@ def _configure_admin(app):
         for stored_name in stored_names:
             _delete_uploaded_file(stored_name)
         return jsonify(status="deleted")
+
+    @app.put("/api/games/<int:game_id>/featured")
+    def feature_game(game_id):
+        """Pin a game as "Ukens spill" until a given day (or until it is unpinned), with an optional note."""
+        game = g.db.get(Game, game_id)
+        if not game:
+            return jsonify(error="Spillet finnes ikke."), 404
+        body = request.get_json(silent=True) or {}
+        try:
+            until = featured_until(body.get("until"))
+        except ValueError as error:
+            return jsonify(error=str(error)), 400
+        note = str(body.get("note") or "").strip()
+        if len(note) > MAX_FEATURED_NOTE:
+            return jsonify(error=f"Begrunnelsen kan ha maks {MAX_FEATURED_NOTE} tegn."), 400
+        # A game that is already pinned keeps its place among the others.
+        if not featured_info(game):
+            game.featured_since = datetime.now(timezone.utc).isoformat(timespec="seconds")
+        game.featured_until = until
+        game.featured_note = note or None
+        g.db.flush()
+        return jsonify(featured=featured_info(game))
+
+    @app.delete("/api/games/<int:game_id>/featured")
+    def unfeature_game(game_id):
+        game = g.db.get(Game, game_id)
+        if not game:
+            return jsonify(error="Spillet finnes ikke."), 404
+        game.featured_since = game.featured_until = game.featured_note = None
+        return jsonify(featured=None)
 
     @app.post("/api/steam")
     def steam_metadata():

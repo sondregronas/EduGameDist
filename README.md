@@ -27,10 +27,12 @@ The user interface is in Norwegian; the documentation is in English.
 - **Hide games** from visitors with the eye icon on the admin dashboard, without deleting them.
 - **Light and dark mode** with a switch, following the visitor's system setting until they choose.
 - **Shared category list** that games pick from; renaming a category updates every game that has it.
-- **Category and platform filters** on the front page. Filtered views can be linked, e.g. `/?category=puzzle`.
+- **Category and platform filters** on the front page. Pick several categories at once and show games with at least one or all of them. Filtered views can be linked, e.g. `/?category=puzzle&category=co-op`.
+- **Ukens spill (this week's games):** pin games to a highlighted section at the top of the front page, with the week number and a note on why they were picked. Pins end on their own after the chosen day.
 - **Import from Steam:** title, description, developer and cover image (downloaded and stored locally). GOG, itch.io and Humble links are looked up automatically.
 - **Settings in the browser:** site title, logo/favicon, front page heading and text, menu links (in any order), the installation guide and terms page, and the admin password.
-- **Password-protected admin** with a simple login page.
+- **Password-protected admin** with a simple login page, and optional **GitHub login** for chosen GitHub users, set up in the browser (the client secret is write-only). A signed-in GitHub user can reset the admin password.
+- **Shortcut to admin:** browsers that have used admin are sent from the public site to the same page in admin.
 - Existing NocoDB data and older uploads are migrated automatically on startup.
 
 ## Installation

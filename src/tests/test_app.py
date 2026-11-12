@@ -3,9 +3,11 @@ import os
 import sys
 import tempfile
 import unittest
+from datetime import date
 from pathlib import Path
 from unittest import mock
 from unittest.mock import patch
+from urllib.parse import parse_qs, urlparse
 
 from sqlalchemy import delete, func, select
 from sqlalchemy.exc import OperationalError
@@ -15,6 +17,7 @@ sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 
 import app as app_module
 import database
+import github
 import stores
 from app import create_admin_app, create_public_app
 from stores import FetchError
@@ -526,6 +529,105 @@ class EduGameDistAppTests(unittest.TestCase):
         self.assertRegex(page, option.format("browser"))
         self.assertNotIn('data-value="mac"', page)
         self.assertIn('href="/?category=puzzle"', self.public_client.get(f"/{slug}").get_data(as_text=True))
+        # Several categories can be picked at once, matching any or all of them.
+        self.assertRegex(page, r'id="category-menu" role="listbox"[^>]*aria-multiselectable="true"')
+        self.assertRegex(page, r'<div class="dropdown" id="category-filter" data-multiple>')
+        self.assertIn('name="category-match" value="all"', page)
+        self.assertNotRegex(page, r'id="platform-menu"[^>]*aria-multiselectable')
+
+    def test_browsers_that_used_admin_are_sent_from_the_public_site_to_admin(self):
+        _game_id, slug = self.create_game()
+        self.assertEqual(self.public_client.get("/").status_code, 200)
+        self.assertEqual(self.admin_client.post("/api/public-forward", json={}).status_code, 400)
+        self.assertEqual(self.admin_client.post("/api/public-forward", json={}, headers={"Origin": "https://evil.example"}).status_code, 403)
+        links = self.admin_client.post("/api/public-forward", json={"back": f"/{slug}?edit=1"}, headers={"Origin": "http://localhost"}).json
+        on, off = urlparse(links["on"]), urlparse(links["off"])
+        self.assertEqual((on.path, links["health"]), ("/admin-forward", "http://localhost/health"))
+        self.assertTrue(links["same_site"])  # PUBLIC_URL is left at its default in the tests
+
+        # A made-up token does nothing, and the link can only send the browser back to admin.
+        self.assertEqual(self.public_client.get("/admin-forward?token=wrong&back=/").headers["Location"], "/")
+        self.assertEqual(self.public_client.get("/").status_code, 200)
+        token = parse_qs(on.query)["token"][0]
+        escape = self.public.test_client().get(f"/admin-forward?token={token}&back=//evil.example/")
+        self.assertEqual(escape.headers["Location"], "http://localhost/")
+
+        handoff = self.public_client.get(f"{on.path}?{on.query}")
+        self.assertEqual(handoff.headers["Location"], f"http://localhost/{slug}?edit=1")
+        self.assertIn(f"Max-Age={400 * 24 * 60 * 60}", handoff.headers["Set-Cookie"])
+        self.assertEqual(handoff.headers["Referrer-Policy"], "no-referrer")
+        page = self.public_client.get("/?category=puzzle&category=co-op")
+        self.assertEqual((page.status_code, page.headers["Location"]), (302, "http://localhost/?category=puzzle&category=co-op"))
+        self.assertEqual(self.public_client.get(f"/{slug}").headers["Location"], f"http://localhost/{slug}")
+        self.assertEqual(self.public_client.get("/install").status_code, 302)
+        self.assertEqual(self.public_client.get("/health").status_code, 200)
+        with self.public_client.get("/assets/css/app.css") as asset:
+            self.assertEqual(asset.status_code, 200)
+
+        # "Åpne nettsiden" in admin shows the public site for a while instead.
+        self.assertIn('href="http://localhost/?public=1"', self.admin_client.get("/").get_data(as_text=True))
+        self.assertEqual(self.public_client.get("/?public=1").status_code, 200)
+        self.assertEqual(self.public_client.get(f"/{slug}").status_code, 200)
+
+        # Turning it off in a browser removes the cookie there.
+        other = self.public.test_client()
+        other.get(f"{on.path}?{on.query}")
+        self.assertEqual(other.get("/").status_code, 302)
+        self.assertEqual(other.get(f"{off.path}?{off.query}").headers["Location"], f"http://localhost/{slug}?edit=1")
+        self.assertEqual(other.get("/").status_code, 200)
+
+    def test_games_can_be_pinned_as_this_weeks_game_until_a_day(self):
+        thursday = date(2026, 11, 12)
+        game_id, slug = self.create_game(title="Ukespill", description="Beskrivelse av spillet")
+        self.create_game(title="Vanlig spill")
+        with patch("database.today", return_value=thursday):
+            options = database.featured_options()
+            self.assertEqual((options["this"]["until"], options["this"]["week"], options["suggest"]), ("2026-11-15", 46, "this"))
+            self.assertEqual(options["next"]["text"], "søndag 22. november")
+            pin = lambda **body: self.admin_client.put(f"/api/games/{game_id}/featured", json=body)
+            for body in ({"until": "2026-11-11"}, {"until": "2028-01-01"}, {"until": "neste uke"}, {"until": None, "note": "x" * 301}):
+                self.assertEqual(pin(**body).status_code, 400, body)
+            self.assertEqual(self.admin_client.put("/api/games/999/featured", json={}).status_code, 404)
+            response = pin(until="2026-11-15", note="Vi bruker det i samfunnsfag <b>denne</b> uken")
+            self.assertEqual(response.status_code, 200, response.get_data(as_text=True))
+            self.assertEqual(response.json["featured"]["until_text"], "søndag 15. november")
+            since = response.json["featured"]["since"]
+
+            page = self.public_client.get("/").get_data(as_text=True)
+            spotlight = page.split('<section class="spotlight', 1)[1].split("</section>", 1)[0]
+            self.assertIn("Uke 46", spotlight)
+            self.assertIn("Ukespill", spotlight)
+            self.assertNotIn("Vanlig spill", spotlight)
+            self.assertIn("Vi bruker det i samfunnsfag &lt;b&gt;denne&lt;/b&gt; uken", spotlight)
+            self.assertIn("is-single", page.split('<section class="spotlight', 1)[1][:30])
+            self.assertIn("is-featured", page)
+            self.assertNotIn("feature-dialog", page)
+            game_page = self.public_client.get(f"/{slug}").get_data(as_text=True)
+            self.assertIn('class="featured-chip', game_page)
+            self.assertIn("Hvorfor ukens spill?", game_page)
+            admin_page = self.admin_client.get("/").get_data(as_text=True)
+            self.assertIn('id="feature-dialog"', admin_page)
+            self.assertIn("Til og med søndag 15. november", admin_page)
+            self.assertEqual(admin_page.count('class="card-star" aria-pressed="true"'), 2)  # in the spotlight and the grid
+            self.assertEqual(admin_page.count('class="card-star" aria-pressed="false"'), 1)
+
+            # Changing a pinned game keeps its place; hidden games are only shown in admin.
+            self.assertEqual(pin(until=None).json["featured"]["since"], since)
+            self.admin_client.put(f"/api/games/{game_id}", json={"hidden": True})
+            self.assertNotIn('class="spotlight', self.public_client.get("/").get_data(as_text=True))
+            self.assertIn('class="spotlight-card is-concealed"', self.admin_client.get("/").get_data(as_text=True))
+            self.admin_client.put(f"/api/games/{game_id}", json={"hidden": False})
+            pin(until="2026-11-15")
+
+        # The pin ends on its own after the last day.
+        with patch("database.today", return_value=date(2026, 11, 16)):
+            self.assertNotIn('class="spotlight', self.public_client.get("/").get_data(as_text=True))
+            self.assertIsNone(self.admin_client.get(f"/api/games/{game_id}").json["featured"])
+            self.assertEqual(database.featured_options()["suggest"], "this")
+        with patch("database.today", return_value=date(2026, 11, 14)):
+            self.assertEqual(database.featured_options()["suggest"], "next")
+            self.assertEqual(self.admin_client.delete(f"/api/games/{game_id}/featured").status_code, 200)
+            self.assertNotIn('class="spotlight', self.public_client.get("/").get_data(as_text=True))
 
     def test_site_settings_change_title_front_page_and_menu(self):
         response = self.admin_client.put("/api/settings", json={
@@ -906,6 +1008,207 @@ class AdminLoginTests(unittest.TestCase):
         self.assertEqual(stranger.get("/").status_code, 302)
         self.assertEqual(stranger.post("/login", data={"password": "langt-passord"}).status_code, 302)
         self.assertIn("Logg ut", stranger.get("/").get_data(as_text=True))
+
+
+OCTOCAT = {"id": 583231, "login": "octocat", "type": "User"}
+HUBOT = {"id": 480938, "login": "hubot", "type": "User"}
+SECRET = "0123456789abcdef0123456789abcdefsecr3t9"
+
+
+def fake_github(signed_in=None, known=(OCTOCAT, HUBOT, {"id": 9919, "login": "github", "type": "Organization"})):
+    """Stand-in for github._request: the token exchange, /user and /users/<name>."""
+    accounts = {account["login"].lower(): account for account in known}
+
+    def request(url, data=None, token=None, timeout=10):
+        if url == github.TOKEN_URL:
+            if data["client_secret"] != SECRET:
+                return 200, {"error": "incorrect_client_credentials"}
+            return 200, {"access_token": "gho_token"} if data["code"] == "good" else {"error": "bad_verification_code"}
+        if url == f"{github.API_URL}/user":
+            return (200, signed_in) if token == "gho_token" and signed_in else (401, {})
+        if url.startswith(f"{github.API_URL}/users/"):
+            account = accounts.get(url.rsplit("/", 1)[1].lower())
+            return (200, account) if account else (404, {"message": "Not Found"})
+        raise AssertionError(f"unexpected request: {url}")
+
+    return request
+
+
+class GitHubLoginTests(unittest.TestCase):
+    def setUp(self):
+        self.temp_dir = tempfile.TemporaryDirectory()
+        self.addCleanup(self.temp_dir.cleanup)
+        self.app = self.make_app("hemmelig")
+        self.client = self.app.test_client()
+
+    def make_app(self, password, name="data"):
+        with mock.patch.dict(os.environ, {"ADMIN_PASSWORD": password, "SECRET_KEY": ""}):
+            app = create_admin_app(Path(self.temp_dir.name) / name, Path(self.temp_dir.name) / "games")
+        self.addCleanup(app.extensions["database_engine"].dispose)
+        return app
+
+    def setup_github(self, client, users=(OCTOCAT,), current="hemmelig"):
+        saved = client.put("/api/settings/github", json={"client_id": "Ov23liClientId", "client_secret": SECRET, "current": current})
+        self.assertEqual(saved.status_code, 200, saved.get_data(as_text=True))
+        with patch("github._request", side_effect=fake_github()):
+            for user in users:
+                added = client.post("/api/settings/github/users", json={"login": user["login"], "current": current})
+                self.assertEqual(added.status_code, 201, added.get_data(as_text=True))
+
+    def github_sign_in(self, client, account, code="good", next_path="/settings"):
+        start = client.get(f"/login/github?next={next_path}")
+        self.assertEqual(start.status_code, 302, start.get_data(as_text=True))
+        location = urlparse(start.headers["Location"])
+        self.assertEqual(f"{location.scheme}://{location.netloc}{location.path}", github.AUTHORIZE_URL)
+        query = parse_qs(location.query)
+        self.assertEqual(query["client_id"], ["Ov23liClientId"])
+        self.assertNotIn("scope", query)
+        with patch("github._request", side_effect=fake_github(signed_in=account)):
+            return client.get(f"/login/github/callback?code={code}&state={query['state'][0]}")
+
+    def test_oauth_app_is_saved_with_the_admin_password_and_the_secret_is_never_sent_back(self):
+        self.client.post("/login", data={"password": "hemmelig"})
+        body = {"client_id": "Ov23liClientId", "client_secret": SECRET}
+        self.assertEqual(self.client.put("/api/settings/github", json=body).status_code, 403)
+        self.assertEqual(self.client.put("/api/settings/github", json={**body, "current": "feil"}).status_code, 403)
+        self.assertEqual(self.client.put("/api/settings/github", json={"client_id": "bad id!", "current": "hemmelig"}).status_code, 400)
+        self.assertEqual(self.client.put("/api/settings/github", json={"client_id": "Ov23liClientId", "current": "hemmelig"}).status_code, 400)
+        saved = self.client.put("/api/settings/github", json={**body, "current": "hemmelig"})
+        self.assertEqual(saved.status_code, 200)
+        self.assertEqual((saved.json["secret_hint"], saved.json["configured"], saved.json["active"]), ("••••r3t9", True, False))
+        self.assertNotIn(SECRET, saved.get_data(as_text=True))
+        page = self.client.get("/settings").get_data(as_text=True)
+        self.assertNotIn(SECRET, page)
+        self.assertIn('"secret_hint": "\\u2022\\u2022\\u2022\\u2022r3t9"', page)
+        self.assertIn("/login/github/callback", page)
+        # Leaving the secret out keeps the saved one.
+        kept = self.client.put("/api/settings/github", json={"client_id": "Ov23liOther", "current": "hemmelig"})
+        self.assertEqual((kept.status_code, kept.json["client_id"], kept.json["secret_hint"]), (200, "Ov23liOther", "••••r3t9"))
+        # Without users, nobody can sign in with GitHub yet.
+        login = self.app.test_client().get("/login").get_data(as_text=True)
+        self.assertNotIn("Logg inn med GitHub", login)
+        removed = self.client.delete("/api/settings/github", json={"current": "hemmelig"})
+        self.assertEqual((removed.status_code, removed.json["configured"], removed.json["secret_hint"]), (200, False, ""))
+
+    def test_users_are_added_by_name_and_matched_by_id(self):
+        self.client.post("/login", data={"password": "hemmelig"})
+        self.setup_github(self.client, users=())
+        add = lambda login, current="hemmelig": self.client.post("/api/settings/github/users", json={"login": login, "current": current})
+        with patch("github._request", side_effect=fake_github()):
+            self.assertEqual(add("octocat", current="feil").status_code, 403)
+            self.assertEqual(add("not a name").status_code, 400)
+            self.assertEqual(add("nobody-here").status_code, 404)
+            self.assertEqual(add("github").status_code, 404)
+            response = add("https://github.com/OctoCat")
+            self.assertEqual(response.status_code, 201, response.get_data(as_text=True))
+            self.assertEqual(response.json["users"][0]["id"], OCTOCAT["id"])
+            self.assertEqual(response.json["users"][0]["added_by"], "admin-passordet")
+            self.assertEqual(add("@octocat").status_code, 409)
+            self.assertTrue(response.json["active"])
+        with patch("github._request", side_effect=github.GitHubError("Fikk ikke kontakt med GitHub.")):
+            self.assertEqual(add("hubot").status_code, 502)
+
+    def test_allowed_github_user_signs_in_and_others_are_turned_away(self):
+        owner = self.app.test_client()
+        owner.post("/login", data={"password": "hemmelig"})
+        self.setup_github(owner)
+
+        visitor = self.app.test_client()
+        login = visitor.get("/login").get_data(as_text=True)
+        self.assertIn("Logg inn med GitHub", login)
+        self.assertIn('name="password"', login)
+        # A callback that was not started by this browser is rejected.
+        forged = visitor.get("/login/github/callback?code=good&state=made-up")
+        self.assertEqual(forged.status_code, 400)
+        self.assertEqual(visitor.get("/api/games").status_code, 401)
+        self.assertEqual(self.github_sign_in(visitor, HUBOT).status_code, 403)
+        self.assertEqual(visitor.get("/api/games").status_code, 401)
+        self.assertEqual(self.github_sign_in(visitor, OCTOCAT, code="expired").status_code, 502)
+
+        # Matched by id, so a renamed account still gets in and the new name is shown.
+        renamed = {**OCTOCAT, "login": "octo-renamed"}
+        response = self.github_sign_in(visitor, renamed)
+        self.assertEqual((response.status_code, response.headers["Location"]), (302, "/settings"))
+        self.assertEqual(visitor.get("/api/games").status_code, 200)
+        page = visitor.get("/settings").get_data(as_text=True)
+        self.assertIn(f"avatars.githubusercontent.com/u/{OCTOCAT['id']}", page)
+        self.assertIn("octo-renamed", page)
+        self.assertNotIn('id="password-current"', page)
+        self.assertIn('id="password-confirm"', page)
+
+        # Removing the user ends the session straight away.
+        removed = owner.delete(f"/api/settings/github/users/{OCTOCAT['id']}", json={"current": "hemmelig"})
+        self.assertEqual(removed.status_code, 200)
+        self.assertEqual(visitor.get("/api/games").status_code, 401)
+
+    def test_wrong_client_secret_is_explained(self):
+        owner = self.app.test_client()
+        owner.post("/login", data={"password": "hemmelig"})
+        self.setup_github(owner)
+        owner.put("/api/settings/github", json={"client_id": "Ov23liClientId", "client_secret": "wrong-secret", "current": "hemmelig"})
+        response = self.github_sign_in(self.app.test_client(), OCTOCAT)
+        self.assertEqual(response.status_code, 502)
+        self.assertIn("Client secret", response.get_data(as_text=True))
+
+    def test_github_user_manages_access_without_the_password_and_resets_it_with_setadmin(self):
+        owner = self.app.test_client()
+        owner.post("/login", data={"password": "hemmelig"})
+        self.setup_github(owner)
+        member = self.app.test_client()
+        self.github_sign_in(member, OCTOCAT)
+
+        with patch("github._request", side_effect=fake_github()):
+            added = member.post("/api/settings/github/users", json={"login": "hubot"})
+        self.assertEqual(added.status_code, 201, added.get_data(as_text=True))
+        self.assertEqual(added.json["users"][-1]["added_by"], "@octocat")
+        self.assertEqual(member.put("/api/settings/github", json={"client_id": "Ov23liClientId"}).status_code, 200)
+
+        change = lambda **body: member.post("/api/settings/password", json={"password": "nytt-passord", **body})
+        self.assertEqual(change().status_code, 403)
+        self.assertEqual(change(confirm="setadmin").status_code, 403)
+        self.assertEqual(change(current="hemmelig").status_code, 403)
+        self.assertEqual(change(confirm=" SETADMIN ").status_code, 200)
+        # The GitHub session stays; everyone who signed in with the old password is signed out.
+        self.assertEqual(member.get("/api/games").status_code, 200)
+        self.assertEqual(owner.get("/api/games").status_code, 401)
+        stranger = self.app.test_client()
+        self.assertEqual(stranger.post("/login", data={"password": "hemmelig"}).status_code, 401)
+        self.assertEqual(stranger.post("/login", data={"password": "nytt-passord"}).status_code, 302)
+
+        self.assertEqual(member.delete("/api/settings/password", json={}).status_code, 403)
+        reset = member.delete("/api/settings/password", json={"confirm": "SETADMIN"})
+        self.assertEqual((reset.status_code, reset.json["source"]), (200, "env"))
+        self.assertEqual(member.get("/api/games").status_code, 200)
+
+        # Removing yourself signs you out.
+        self.assertEqual(member.delete(f"/api/settings/github/users/{OCTOCAT['id']}").status_code, 200)
+        self.assertEqual(member.get("/api/games").status_code, 401)
+
+    def test_github_can_be_the_only_way_to_sign_in(self):
+        app = self.make_app("", name="open")
+        owner = app.test_client()
+        self.assertEqual(owner.get("/api/games").status_code, 200)
+        self.setup_github(owner, current="")
+        # Login is now required, and only GitHub is offered.
+        self.assertEqual(owner.get("/api/games").status_code, 401)
+        login = owner.get("/login").get_data(as_text=True)
+        self.assertIn("Logg inn med GitHub", login)
+        self.assertNotIn('name="password"', login)
+        self.assertEqual(owner.post("/login", data={"password": "noe"}).status_code, 400)
+        self.github_sign_in(owner, OCTOCAT)
+        self.assertEqual(owner.get("/api/games").status_code, 200)
+        # A GitHub user can add a password without the confirmation word, since there is none to replace.
+        self.assertEqual(owner.post("/api/settings/password", json={"password": "langt-passord"}).status_code, 200)
+        self.assertEqual(app.test_client().post("/login", data={"password": "langt-passord"}).status_code, 302)
+        self.assertEqual(owner.delete("/api/settings/github", json={}).status_code, 200)
+        self.assertEqual(owner.get("/api/games").status_code, 401)
+
+    def test_login_normalization(self):
+        for value, expected in (("octocat", "octocat"), ("@Octo-Cat", "Octo-Cat"), ("https://github.com/octocat/", "octocat"), ("https://www.github.com/a-b?tab=repos", "a-b")):
+            self.assertEqual(github.normalize_login(value), expected)
+        for value in ("", "-leading", "trailing-", "dou--ble", "x" * 40, "https://gitlab.com/octocat", "a b"):
+            with self.assertRaises(ValueError, msg=value):
+                github.normalize_login(value)
 
 
 if __name__ == "__main__":

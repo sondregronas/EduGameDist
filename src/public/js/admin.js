@@ -88,6 +88,68 @@
     toast(message, type)
   }
 
+  // ---------- Snarvei: nettlesere som har vært i admin, sendes hit fra den offentlige nettsiden ----------
+  // Admin kan ikke sette en informasjonskapsel for den offentlige nettsiden direkte, så nettleseren sendes én gang
+  // innom /admin-forward der og rett tilbake. Valget for denne nettleseren huskes her.
+  const FORWARD_KEY = 'public-forward'
+  const DAY = 24 * 60 * 60 * 1000
+  const storage = (() => {
+    try { localStorage.setItem('storage-test', '1'); localStorage.removeItem('storage-test'); return true } catch { return false }
+  })()
+  const forwardState = () => { try { return JSON.parse(localStorage.getItem(FORWARD_KEY)) || {} } catch { return {} } }
+  const setForwardState = (state) => { try { localStorage.setItem(FORWARD_KEY, JSON.stringify({ state, at: Date.now() })) } catch { /* lagring er blokkert */ } }
+
+  async function publicForward(turnOn, back = location.pathname + location.search + location.hash) {
+    const links = await api('POST', '/api/public-forward', { back })
+    if (links.same_site) throw new Error('PUBLIC_URL peker på admin. Sett den til adressen til den offentlige nettsiden.')
+    if (turnOn) {
+      // Sjekk at nettsiden svarer før nettleseren sendes dit, så en feil PUBLIC_URL ikke gir en feilside.
+      try { await fetch(links.health, { mode: 'no-cors', credentials: 'omit', cache: 'no-store' }) } catch {
+        throw new Error(`Fant ikke den offentlige nettsiden på ${new URL(links.health).origin}. Sjekk PUBLIC_URL.`)
+      }
+    }
+    setForwardState(turnOn ? 'on' : 'off')
+    location.assign(turnOn ? links.on : links.off)
+  }
+
+  // Første gang (og omtrent én gang i året) skjer det av seg selv, men ikke midt i noe.
+  {
+    const { state, at = 0 } = forwardState()
+    const due = !state || (state === 'on' && Date.now() - at > 300 * DAY) || (state === 'unreachable' && Date.now() - at > DAY)
+    if (storage && due && !pending && !new URLSearchParams(location.search).has('edit')) {
+      publicForward(true).catch(() => setForwardState('unreachable'))
+    }
+  }
+
+  function initForward() {
+    const card = $('#forward')
+    const { state } = forwardState()
+    const on = state === 'on'
+    const pill = $('#forward-state')
+    pill.textContent = on ? 'På her' : state === 'unreachable' ? 'Fant ikke nettsiden' : 'Av her'
+    pill.className = `status-pill${on ? ' on' : state === 'unreachable' ? ' partial' : ''}`
+    $('#forward-hint').textContent = !storage
+      ? 'Nettleseren lar ikke admin lagre valget, så snarveien kan ikke brukes her.'
+      : on ? 'Denne nettleseren sendes hit når den åpner den offentlige nettsiden.'
+        : state === 'unreachable' ? `Admin fikk ikke kontakt med ${card.dataset.public}. Sjekk at PUBLIC_URL er adressen til den offentlige nettsiden.`
+          : 'Denne nettleseren blir på den offentlige nettsiden.'
+    const toggle = $('#forward-toggle')
+    toggle.replaceChildren(icon(on ? 'close' : 'check'), on ? 'Slå av i denne nettleseren' : 'Slå på i denne nettleseren')
+    toggle.disabled = !storage
+    toggle.addEventListener('click', async () => {
+      toggle.disabled = true
+      flash(on ? 'Snarveien er slått av i denne nettleseren.' : 'Snarveien er slått på i denne nettleseren.', 'success')
+      try {
+        await publicForward(!on, '/settings#forward')
+      } catch (problem) {
+        sessionStorage.removeItem('flash')
+        toast(problem.message, 'error')
+        if (!on) setForwardState('unreachable')
+        toggle.disabled = false
+      }
+    })
+  }
+
   // Flytt elementer i en liste ved å dra dem (mus og berøring), eller med piltastene. Elementet løftes og
   // følger pekeren, de andre glir unna, og det pulserer når det er plassert.
   const calm = matchMedia('(prefers-reduced-motion: reduce)')
@@ -543,8 +605,224 @@
     })
   }
 
+  // ---------- Ukens spill: fest spill øverst på forsiden en periode ----------
+  const featureDialog = $('#feature-dialog')
+  if (featureDialog) initFeatureDialog()
+
+  function initFeatureDialog() {
+    const options = JSON.parse($('#feature-data').textContent)
+    const form = $('#feature-form')
+    const date = $('#feature-date')
+    const note = $('#feature-note')
+    const error = $('#feature-error')
+    const remove = $('#feature-remove')
+    const save = $('#feature-save')
+    let game = null
+
+    const choose = (value) => { $(`input[name="feature-until"][value="${value}"]`, form).checked = true }
+    // I redigeringsmodus på spillsiden fortsetter man å redigere etter at siden er lastet på nytt.
+    const reload = () => (document.body.classList.contains('editing') ? location.assign(`${location.pathname}?edit=1`) : location.reload())
+    const fail = (message) => { error.textContent = message; error.hidden = false }
+    $$('[data-close]', featureDialog).forEach((button) => button.addEventListener('click', () => featureDialog.close()))
+    date.addEventListener('focus', () => choose('date'))
+    date.addEventListener('input', () => choose('date'))
+
+    document.addEventListener('click', (event) => {
+      const button = event.target.closest('[data-feature]')
+      if (!button) return
+      event.preventDefault()
+      game = JSON.parse(button.dataset.feature)
+      const current = game.featured
+      $('#feature-game').replaceChildren(icon('gamepad'), el('span', {}, game.title))
+      error.hidden = true
+      note.value = current?.note || ''
+      date.value = current?.until || options[options.suggest].until
+      if (!current) choose(options.suggest)
+      else if (!current.until) choose('none')
+      else choose(['this', 'next'].find((key) => options[key].until === current.until) || 'date')
+      remove.hidden = !current
+      save.lastChild.textContent = current ? 'Lagre' : 'Fest'
+      save.disabled = false
+      featureDialog.showModal()
+    })
+
+    form.addEventListener('submit', async (event) => {
+      event.preventDefault()
+      const picked = $('input[name="feature-until"]:checked', form).value
+      if (picked === 'date' && !date.value) { fail('Velg en dato.'); date.focus(); return }
+      const until = picked === 'none' ? null : picked === 'date' ? date.value : options[picked].until
+      save.disabled = true
+      try {
+        const { featured } = await api('PUT', `/api/games/${game.id}/featured`, { until, note: note.value })
+        flash(featured.until_text ? `«${game.title}» er ukens spill til og med ${featured.until_text}.` : `«${game.title}» er ukens spill til du fjerner det.`, 'success')
+        reload()
+      } catch (problem) {
+        fail(problem.message)
+        save.disabled = false
+      }
+    })
+
+    remove.addEventListener('click', async () => {
+      remove.disabled = true
+      try {
+        await api('DELETE', `/api/games/${game.id}/featured`)
+        flash(`«${game.title}» er ikke lenger ukens spill.`, 'success')
+        reload()
+      } catch (problem) {
+        fail(problem.message)
+      } finally {
+        remove.disabled = false
+      }
+    })
+  }
+
   // ---------- Innstillinger ----------
   if ($('#settings')) initSettings()
+
+  // ---------- GitHub-innlogging: OAuth-appen og hvem som får logge inn ----------
+  function initGitHub(initial) {
+    let status = initial
+    const clientId = $('#github-client-id')
+    const secret = $('#github-client-secret')
+    const currentField = $('#github-current-field')
+    const current = $('#github-current')
+    const list = $('#github-users')
+    const userInput = $('#github-user-login')
+    const formatDate = (value) => {
+      const day = new Date(value)
+      return Number.isNaN(day.getTime()) ? '' : day.toLocaleDateString('nb-NO', { day: 'numeric', month: 'long', year: 'numeric' })
+    }
+    const me = () => status.users.find((user) => user.id === status.signed_in_as)
+    // Uten GitHub-innlogging bekreftes endringer med admin-passordet (hvis det finnes et).
+    const withAuth = (body = {}) => (status.needs_password ? { ...body, current: current.value } : body)
+
+    $('#github-homepage').textContent = `${location.origin}/`
+    $('#github-callback').textContent = `${location.origin}${status.callback_path}`
+    $$('[data-copy]').forEach((button) => button.addEventListener('click', async () => {
+      try {
+        await navigator.clipboard.writeText($(`#${button.dataset.copy}`).textContent)
+        toast('Kopiert.', 'success')
+      } catch {
+        toast('Kunne ikke kopiere. Marker adressen og kopier den selv.', 'error')
+      }
+    }))
+    clientId.value = status.client_id
+    $('#github-guide').open = !status.configured
+
+    function render() {
+      const state = $('#github-state')
+      state.textContent = status.active ? 'På' : status.configured ? 'Ingen brukere' : status.users.length ? 'Mangler GitHub-app' : 'Av'
+      state.className = `status-pill${status.active ? ' on' : status.configured || status.users.length ? ' partial' : ''}`
+      $('#github-secret-saved').hidden = !status.secret_hint
+      $('#github-secret-hint').textContent = status.secret_hint
+      secret.hidden = Boolean(status.secret_hint)
+      $('#github-remove').hidden = !status.configured
+      currentField.hidden = !status.needs_password
+      const self = me()
+      $('#github-auth-hint').textContent = self
+        ? `Du er logget inn som @${self.login}, så endringer her trenger ikke admin-passordet.`
+        : !status.login_required ? 'Innlogging er av nå. Når GitHub-appen er lagret og den første brukeren har fått tilgang, må alle logge inn i admin, også du.' : ''
+      list.replaceChildren(...status.users.map(userRow))
+      if (!status.users.length) list.append(el('li', { class: 'user-empty' }, 'Ingen har tilgang med GitHub ennå.'))
+    }
+
+    function userRow(user) {
+      const self = user.id === status.signed_in_as
+      const details = [self ? 'Deg' : '', user.added_by && `lagt til av ${user.added_by}`, user.added_at && formatDate(user.added_at)].filter(Boolean).join(' · ')
+      const remove = el('button', { type: 'button', class: 'icon-btn danger', title: 'Fjern tilgangen', 'aria-label': `Fjern tilgangen til @${user.login}` }, icon('trash'))
+      remove.addEventListener('click', async () => {
+        const question = self ? 'Fjerne din egen tilgang? Du blir logget ut med en gang.' : `Fjerne tilgangen til @${user.login}? Er brukeren logget inn, blir den logget ut.`
+        if (!confirm(question)) return
+        remove.disabled = true
+        try {
+          update(await api('DELETE', `/api/settings/github/users/${user.id}`, withAuth()), `@${user.login} har ikke lenger tilgang.`)
+        } catch (problem) {
+          failed(problem)
+          remove.disabled = false
+        }
+      })
+      return el('li', { class: `user-row${self ? ' is-self' : ''}` },
+        el('img', { class: 'user-avatar', src: `https://avatars.githubusercontent.com/u/${user.id}?s=80`, alt: '', width: '36', height: '36', loading: 'lazy' }),
+        el('span', { class: 'user-info' },
+          el('a', { class: 'user-name', href: `https://github.com/${encodeURIComponent(user.login)}`, target: '_blank', rel: 'noopener noreferrer' }, `@${user.login}`),
+          el('span', { class: 'user-meta' }, details)),
+        remove)
+    }
+
+    // Når innloggingen slås av eller på, eller man fjerner seg selv, lastes siden på nytt (og sender til innlogging ved behov).
+    function update(next, message) {
+      const reload = next.login_required !== status.login_required || next.signed_in_as !== status.signed_in_as
+      status = next
+      if (reload) { flash(message, 'success'); location.reload(); return }
+      render()
+      toast(message, 'success')
+    }
+    function failed(problem) {
+      toast(problem.message, 'error')
+      if (status.needs_password && /passord/i.test(problem.message)) current.focus()
+    }
+    const needsPassword = () => {
+      if (status.needs_password && !current.value) { toast('Skriv inn admin-passordet først.', 'error'); current.focus(); return true }
+      return false
+    }
+    const turnsOnLogin = (users, configured) => !status.login_required && users > 0 && configured &&
+      !confirm('Dette slår på innloggingen: alle må logge inn i admin, også du. Fortsette?')
+
+    $('#github-secret-replace').addEventListener('click', () => {
+      $('#github-secret-saved').hidden = true
+      secret.hidden = false
+      secret.focus()
+    })
+
+    $('#github-form').addEventListener('submit', async (event) => {
+      event.preventDefault()
+      if (!clientId.value.trim()) { toast('Lim inn Client ID fra GitHub-appen.', 'error'); clientId.focus(); return }
+      if (!status.secret_hint && !secret.value.trim()) { toast('Lim inn Client secret fra GitHub-appen.', 'error'); secret.focus(); return }
+      if (needsPassword() || turnsOnLogin(status.users.length, true)) return
+      try {
+        const body = withAuth({ client_id: clientId.value.trim() })
+        if (!secret.hidden && secret.value.trim()) body.client_secret = secret.value.trim()
+        const next = await api('PUT', '/api/settings/github', body)
+        secret.value = ''
+        update(next, 'GitHub-appen er lagret. Hemmeligheten vises ikke igjen.')
+      } catch (problem) {
+        failed(problem)
+      }
+    })
+
+    $('#github-remove').addEventListener('click', async () => {
+      const question = me() ? 'Fjerne GitHub-appen? Du er logget inn med GitHub og blir logget ut.' : 'Fjerne GitHub-appen? Ingen kan da logge inn med GitHub. Brukerlisten beholdes.'
+      if (needsPassword() || !confirm(question)) return
+      try {
+        const next = await api('DELETE', '/api/settings/github', withAuth())
+        clientId.value = ''
+        update(next, 'GitHub-appen er fjernet.')
+      } catch (problem) {
+        failed(problem)
+      }
+    })
+
+    $('#github-user-form').addEventListener('submit', async (event) => {
+      event.preventDefault()
+      const login = userInput.value.trim()
+      if (!login) { userInput.focus(); return }
+      if (needsPassword() || turnsOnLogin(status.users.length + 1, status.configured)) return
+      const button = $('button', event.currentTarget)
+      button.disabled = true
+      try {
+        const next = await api('POST', '/api/settings/github/users', withAuth({ login }))
+        userInput.value = ''
+        const added = next.users[next.users.length - 1]
+        update(next, `@${added.login} kan nå logge inn med GitHub.`)
+      } catch (problem) {
+        failed(problem)
+      } finally {
+        button.disabled = false
+      }
+    })
+
+    render()
+  }
 
   function initSettings() {
     const data = JSON.parse($('#settings-data').textContent)
@@ -704,35 +982,49 @@
     // Kategorier: endringer lagres med en gang
     categoryManager($('#category-manager'), data.categories)
 
-    // Passord
+    // Passord. Er man logget inn med GitHub, skriver man SETADMIN i stedet for det nåværende passordet.
     const passwordForm = $('#password-form')
+    const resetWord = passwordForm.dataset.resetWord
+    const currentPassword = $('#password-current')
+    const resetConfirm = $('#password-confirm')
+    const confirmed = () => {
+      if (currentPassword && !currentPassword.value) { toast('Skriv inn nåværende passord først.', 'error'); currentPassword.focus(); return false }
+      if (resetConfirm && resetConfirm.value.trim() !== resetWord) { toast(`Skriv ${resetWord} for å bekrefte.`, 'error'); resetConfirm.focus(); return false }
+      return true
+    }
+    const proof = () => ({ current: currentPassword?.value || '', confirm: resetConfirm?.value || '' })
     passwordForm.addEventListener('submit', async (event) => {
       event.preventDefault()
       const password = $('#password-new').value
       if (password !== $('#password-repeat').value) { toast('De nye passordene er ikke like.', 'error'); return }
+      if (!confirmed()) return
       try {
-        await api('POST', '/api/settings/password', { current: $('#password-current')?.value || '', password })
-        flash('Passordet er lagret. Alle andre er logget ut.', 'success')
+        await api('POST', '/api/settings/password', { ...proof(), password })
+        flash('Passordet er lagret. Alle andre som brukte det gamle passordet, er logget ut.', 'success')
         location.reload()
       } catch (problem) {
         toast(problem.message, 'error')
       }
     })
     $('#password-remove')?.addEventListener('click', async () => {
-      const current = $('#password-current')
-      if (!current.value) { toast('Skriv inn nåværende passord først.', 'error'); current.focus(); return }
+      if (!confirmed()) return
       const question = passwordForm.dataset.env === 'true'
         ? 'Fjerne det lagrede passordet og bruke ADMIN_PASSWORD igjen?'
-        : 'Fjerne det lagrede passordet? ADMIN_PASSWORD er ikke satt, så innloggingen blir slått av.'
+        : passwordForm.dataset.github === 'true'
+          ? `Fjerne det lagrede passordet? ADMIN_PASSWORD er ikke satt, så bare GitHub-brukerne kan logge inn.${resetConfirm ? '' : ' Du blir logget ut.'}`
+          : 'Fjerne det lagrede passordet? ADMIN_PASSWORD er ikke satt, så innloggingen blir slått av.'
       if (!confirm(question)) return
       try {
-        await api('DELETE', '/api/settings/password', { current: current.value })
+        await api('DELETE', '/api/settings/password', proof())
         flash('Det lagrede passordet er fjernet.', 'success')
         location.reload()
       } catch (problem) {
         toast(problem.message, 'error')
       }
     })
+
+    initGitHub(JSON.parse($('#github-data').textContent))
+    initForward()
   }
 
   // ---------- Spillsiden: rediger direkte på siden ----------
