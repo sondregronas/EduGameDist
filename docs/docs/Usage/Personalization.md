@@ -14,7 +14,9 @@ Everything below is changed under **Innstillinger** (Settings) in the admin menu
 
 ## Menu
 
-The menu contains the built-in pages **Spill** (Games), **Installasjon** (Installation) and **Vilkår** (Terms), plus any links you add with **+ Ny lenke** (New link).
+The menu contains the built-in pages **Spill** (Games), **Installasjon** (Installation) and **Vilkår** (Terms), an **Admin** link, plus any links you add with **+ Ny lenke** (New link).
+
+The **Admin** link is only shown on the public site and leads to admin. Its address is the one admin was last opened on, which the browser reports to the server the first time you open admin (no configuration needed). Untick **Vis** (Show) to hide it from visitors.
 
 - Move items up and down with the arrows. Custom links can be placed anywhere, e.g. `Spill | Installasjon | Request a game | Vilkår | School website`.
 - Built-in pages can be renamed (leave the name empty for the default) or hidden by unticking **Vis** (Show).
@@ -54,6 +56,6 @@ Visitors can switch between dark and light mode with the switch at the top right
 
 ## Password and GitHub login
 
-See [Restricting access](../Installation/Access.md#logging-in-with-a-password) for the password, [GitHub login](../Installation/Access.md#logging-in-with-github) and the [shortcut from the public site to admin](../Installation/Access.md#shortcut-from-the-public-site-to-admin).
+See [Restricting access](../Installation/Access.md#logging-in-with-a-password) for the password, turning password login off and [GitHub login](../Installation/Access.md#logging-in-with-github).
 
 Feel free to contribute changes you make to the frontend with a pull request on the [GitHub repository](https://github.com/sondregronas/EduGameDist).

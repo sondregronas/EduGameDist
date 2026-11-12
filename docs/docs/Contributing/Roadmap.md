@@ -14,7 +14,7 @@ This is a living overview of what has been done and what might come. Suggestions
 - Hiding games from visitors, and filtering by category (one or several) and platform.
 - GitHub login for admin for chosen GitHub users, set up under Settings.
 - "Ukens spill": games pinned to the top of the front page for a week or until a chosen day.
-- Browsers that have used admin are sent from the public site straight to admin.
+- An "Admin" link on the public site, password login that can be turned off while GitHub login works, and `FORCE_PASSWORD_LOGIN` / `FORCE_ENV_PASSWORD` to override the login settings.
 
 ## Possible improvements
 - **Users and roles:** roles beyond "admin", and possibly access to some games for some users. Admin is currently protected by one shared password, GitHub login for chosen users and/or the proxy in front of it.

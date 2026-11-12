@@ -10,17 +10,18 @@
   <script src="/assets/js/theme.js"></script>
   {% block head %}{% endblock %}
 </head>
-<body class="{% if admin %}is-admin{% endif %}">
+<body class="{% if admin %}is-admin{% endif %}"{% if admin %} data-admin-address="{{ site.admin_address }}"{% endif %}>
   <header class="site-header">
     <div class="wrap header-inner">
       <a class="brand" href="/">{% if site.logo_url %}<img class="brand-logo" src="{{ site.logo_url }}" alt="">{% else %}{{ icon('gamepad') }}{% endif %}<span>{{ site.title }}</span>{% if admin %}<span class="badge badge-admin">Admin</span>{% endif %}</a>
       <nav class="site-nav" aria-label="Hovedmeny">
-        {% for item in site.nav if not item.hidden %}
+        {# The admin link is for the public site, and only once admin has reported its address. #}
+        {% for item in site.nav if not item.hidden and item.href and not (admin and item.key == 'admin') %}
           <a href="{{ item.href }}"{% if not item.builtin %} class="nav-custom"{% endif %}{% if item.new_tab %} target="_blank" rel="noopener noreferrer"{% endif %} title="{{ item.text }}">{{ icon(item.icon) }}<span>{{ item.text }}</span></a>
         {% endfor %}
         {% if admin %}
           <a href="/settings" title="Innstillinger">{{ icon('cog') }}<span>Innstillinger</span></a>
-          <a href="{{ public_view_url }}" target="_blank" rel="noopener noreferrer" title="Åpne nettsiden">{{ icon('external') }}<span>Åpne nettsiden</span></a>
+          <a href="{{ public_url }}" target="_blank" rel="noopener noreferrer" title="Åpne nettsiden">{{ icon('external') }}<span>Åpne nettsiden</span></a>
         {% endif %}
         {% if auth_enabled and logged_in %}<form method="post" action="/logout" class="logout-form"><button type="submit" class="nav-button" title="Logg ut{% if github_user %} (@{{ github_user.login }}){% endif %}">{% if github_user %}<img class="nav-avatar" src="https://avatars.githubusercontent.com/u/{{ github_user.id }}?s=64" alt="" width="22" height="22">{% else %}{{ icon('logout') }}{% endif %}<span>Logg ut</span></button></form>{% endif %}
       </nav>

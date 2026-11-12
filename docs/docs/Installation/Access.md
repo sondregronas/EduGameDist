@@ -39,24 +39,30 @@ A user signed in with GitHub can replace the admin password without knowing it: 
 
 Use HTTPS in NPM so the password is not sent unencrypted. Sessions are signed with a key stored in `secret.key` in the data volume; set `SECRET_KEY` if you would rather manage it yourself. Changing the key also signs out everyone.
 
-If you forget a password saved under Settings, remove it from the database to fall back to `ADMIN_PASSWORD`:
+If you forget a password saved under Settings, set `FORCE_ENV_PASSWORD=true` (see [below](#environment-variables-that-override-settings)) and log in with `ADMIN_PASSWORD`. To remove the saved password for good, delete it from the database:
 
 ```bash
 docker compose exec admin python -c "import sqlite3; db = sqlite3.connect('/app/data/gamedb.db'); db.execute(\"DELETE FROM settings WHERE key = 'admin_password_hash'\"); db.commit()"
 ```
 
-If GitHub login is the only login and the GitHub app stops working (for example after the secret was revoked), set `ADMIN_PASSWORD` for the admin service and restart it to get back in with a password.
+### Turning password login off
 
-## Shortcut from the public site to admin
+When GitHub login works, you can allow GitHub users only: untick **Tillat innlogging med passord** (Allow password login) under **Passord for admin**. The login page then only offers GitHub, and everyone signed in with the password is signed out. To make sure GitHub login actually works, the switch can only be turned off by someone who is signed in with GitHub.
 
-Browsers that have used admin are sent straight to admin when they open the public site, to the same page (with the same filters). Visitors who have never used admin, such as students, are not affected.
+The password is kept, and comes back on by itself if GitHub login stops being set up (the GitHub app is removed, or the last user loses access), so nobody is locked out. A GitHub user can tick the switch again at any time.
 
-This uses `PUBLIC_URL`, so set it to the address of the public site in `docker-compose.yml`. The first time a browser opens admin, admin checks that the public site answers on that address and then sends the browser once through `PUBLIC_URL/admin-forward` and straight back. That sets a cookie on the public site that lasts 400 days (the longest browsers allow); admin renews it when it is about ten months old. The cookie only says "send this browser to admin"; the admin address it redirects to is stored in the database by admin, so the cookie cannot be used to send anyone to another site.
+### Environment variables that override Settings
 
-- **Åpne nettsiden** (Open website) in the admin menu opens the public site with `?public=1`, which shows the public site for the next three hours in that browser.
-- Under **Innstillinger → Snarvei til admin** (Settings → Shortcut to admin) you can turn the shortcut off or on for the browser you are using.
+Set these for the admin service in `docker-compose.yml` (or an `.env` file) and restart it, for example to get back in:
 
-The shortcut assumes the people who use admin can also reach it wherever they open the public site, for example when both sites are behind the same Access List.
+| Variable | Effect |
+| --- | --- |
+| `FORCE_PASSWORD_LOGIN=true` | Logging in with the password is always allowed, even if it is turned off under Settings. The switch is locked on. |
+| `FORCE_ENV_PASSWORD=true` | Only `ADMIN_PASSWORD` is used. A password saved under Settings is ignored (but kept), and the password cannot be changed or removed there. |
+
+Both default to `false`. `FORCE_ENV_PASSWORD` with an empty `ADMIN_PASSWORD` means there is no password at all.
+
+If GitHub login is the only login and the GitHub app stops working (for example after the secret was revoked), set `ADMIN_PASSWORD` (and `FORCE_PASSWORD_LOGIN=true` if password login was turned off) for the admin service and restart it to get back in with the password.
 
 ## Public site
 

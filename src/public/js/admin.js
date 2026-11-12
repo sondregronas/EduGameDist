@@ -88,66 +88,11 @@
     toast(message, type)
   }
 
-  // ---------- Snarvei: nettlesere som har vært i admin, sendes hit fra den offentlige nettsiden ----------
-  // Admin kan ikke sette en informasjonskapsel for den offentlige nettsiden direkte, så nettleseren sendes én gang
-  // innom /admin-forward der og rett tilbake. Valget for denne nettleseren huskes her.
-  const FORWARD_KEY = 'public-forward'
-  const DAY = 24 * 60 * 60 * 1000
-  const storage = (() => {
-    try { localStorage.setItem('storage-test', '1'); localStorage.removeItem('storage-test'); return true } catch { return false }
-  })()
-  const forwardState = () => { try { return JSON.parse(localStorage.getItem(FORWARD_KEY)) || {} } catch { return {} } }
-  const setForwardState = (state) => { try { localStorage.setItem(FORWARD_KEY, JSON.stringify({ state, at: Date.now() })) } catch { /* lagring er blokkert */ } }
-
-  async function publicForward(turnOn, back = location.pathname + location.search + location.hash) {
-    const links = await api('POST', '/api/public-forward', { back })
-    if (links.same_site) throw new Error('PUBLIC_URL peker på admin. Sett den til adressen til den offentlige nettsiden.')
-    if (turnOn) {
-      // Sjekk at nettsiden svarer før nettleseren sendes dit, så en feil PUBLIC_URL ikke gir en feilside.
-      try { await fetch(links.health, { mode: 'no-cors', credentials: 'omit', cache: 'no-store' }) } catch {
-        throw new Error(`Fant ikke den offentlige nettsiden på ${new URL(links.health).origin}. Sjekk PUBLIC_URL.`)
-      }
-    }
-    setForwardState(turnOn ? 'on' : 'off')
-    location.assign(turnOn ? links.on : links.off)
-  }
-
-  // Første gang (og omtrent én gang i året) skjer det av seg selv, men ikke midt i noe.
-  {
-    const { state, at = 0 } = forwardState()
-    const due = !state || (state === 'on' && Date.now() - at > 300 * DAY) || (state === 'unreachable' && Date.now() - at > DAY)
-    if (storage && due && !pending && !new URLSearchParams(location.search).has('edit')) {
-      publicForward(true).catch(() => setForwardState('unreachable'))
-    }
-  }
-
-  function initForward() {
-    const card = $('#forward')
-    const { state } = forwardState()
-    const on = state === 'on'
-    const pill = $('#forward-state')
-    pill.textContent = on ? 'På her' : state === 'unreachable' ? 'Fant ikke nettsiden' : 'Av her'
-    pill.className = `status-pill${on ? ' on' : state === 'unreachable' ? ' partial' : ''}`
-    $('#forward-hint').textContent = !storage
-      ? 'Nettleseren lar ikke admin lagre valget, så snarveien kan ikke brukes her.'
-      : on ? 'Denne nettleseren sendes hit når den åpner den offentlige nettsiden.'
-        : state === 'unreachable' ? `Admin fikk ikke kontakt med ${card.dataset.public}. Sjekk at PUBLIC_URL er adressen til den offentlige nettsiden.`
-          : 'Denne nettleseren blir på den offentlige nettsiden.'
-    const toggle = $('#forward-toggle')
-    toggle.replaceChildren(icon(on ? 'close' : 'check'), on ? 'Slå av i denne nettleseren' : 'Slå på i denne nettleseren')
-    toggle.disabled = !storage
-    toggle.addEventListener('click', async () => {
-      toggle.disabled = true
-      flash(on ? 'Snarveien er slått av i denne nettleseren.' : 'Snarveien er slått på i denne nettleseren.', 'success')
-      try {
-        await publicForward(!on, '/settings#forward')
-      } catch (problem) {
-        sessionStorage.removeItem('flash')
-        toast(problem.message, 'error')
-        if (!on) setForwardState('unreachable')
-        toggle.disabled = false
-      }
-    })
+  // ---------- «Admin» i menyen på den offentlige nettsiden lenker hit ----------
+  // Serveren vet ikke sikkert hvilken adresse admin har bak proxyen, så nettleseren melder fra når den er en annen
+  // enn den som er lagret. Adressen hentes fra Origin-headeren på serveren.
+  if (document.body.dataset.adminAddress !== `${location.origin}/`) {
+    api('POST', '/api/admin-address').catch(() => { /* lenken oppdateres neste gang */ })
   }
 
   // Flytt elementer i en liste ved å dra dem (mus og berøring), eller med piltastene. Elementet løftes og
@@ -881,7 +826,9 @@
       const options = el('div', { class: 'nav-options' })
       if (builtin) {
         symbol = el('span', { class: 'nav-icon' }, icon(info.icon))
-        target = el('span', { class: 'nav-target', title: info.href }, info.href)
+        // «Admin» lenker til adressen admin er åpnet på, og vises bare på den offentlige nettsiden.
+        const href = item.key === 'admin' ? info.href || `${location.origin}/` : info.href
+        target = el('span', { class: 'nav-target', title: item.key === 'admin' ? 'Vises bare på den offentlige nettsiden' : href }, href)
         const visible = el('input', { type: 'checkbox', class: 'nav-visible' })
         visible.checked = !item.hidden
         row.classList.toggle('is-off', !visible.checked)
@@ -982,8 +929,35 @@
     // Kategorier: endringer lagres med en gang
     categoryManager($('#category-manager'), data.categories)
 
+    // Innlogging med passord av/på. Kan bare slås av av noen som er logget inn med GitHub.
+    const passwordLogin = $('#password-login')
+    passwordLogin?.addEventListener('change', async () => {
+      const enabled = passwordLogin.checked
+      if (!enabled && !confirm('Slå av innlogging med passord? Bare GitHub-brukerne kan da logge inn, og alle som er logget inn med passordet, blir logget ut.')) {
+        passwordLogin.checked = true
+        return
+      }
+      passwordLogin.disabled = true
+      try {
+        await api('PUT', '/api/settings/password-login', { enabled })
+        flash(enabled ? 'Innlogging med passord er slått på.' : 'Innlogging med passord er slått av.', 'success')
+        location.reload()
+      } catch (problem) {
+        toast(problem.message, 'error')
+        passwordLogin.checked = !enabled
+        passwordLogin.disabled = false
+      }
+    })
+
     // Passord. Er man logget inn med GitHub, skriver man SETADMIN i stedet for det nåværende passordet.
+    // Skjemaet finnes ikke når FORCE_ENV_PASSWORD styrer passordet.
     const passwordForm = $('#password-form')
+    if (passwordForm) initPasswordForm(passwordForm)
+
+    initGitHub(JSON.parse($('#github-data').textContent))
+  }
+
+  function initPasswordForm(passwordForm) {
     const resetWord = passwordForm.dataset.resetWord
     const currentPassword = $('#password-current')
     const resetConfirm = $('#password-confirm')
@@ -1022,9 +996,6 @@
         toast(problem.message, 'error')
       }
     })
-
-    initGitHub(JSON.parse($('#github-data').textContent))
-    initForward()
   }
 
   // ---------- Spillsiden: rediger direkte på siden ----------

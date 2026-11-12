@@ -32,7 +32,7 @@ The user interface is in Norwegian; the documentation is in English.
 - **Import from Steam:** title, description, developer and cover image (downloaded and stored locally). GOG, itch.io and Humble links are looked up automatically.
 - **Settings in the browser:** site title, logo/favicon, front page heading and text, menu links (in any order), the installation guide and terms page, and the admin password.
 - **Password-protected admin** with a simple login page, and optional **GitHub login** for chosen GitHub users, set up in the browser (the client secret is write-only). A signed-in GitHub user can reset the admin password.
-- **Shortcut to admin:** browsers that have used admin are sent from the public site to the same page in admin.
+- **Admin link** in the public site's menu (can be renamed or hidden), and a switch to allow **GitHub login only**. `FORCE_PASSWORD_LOGIN` and `FORCE_ENV_PASSWORD` override the login settings from `docker-compose.yml`.
 - Existing NocoDB data and older uploads are migrated automatically on startup.
 
 ## Installation
