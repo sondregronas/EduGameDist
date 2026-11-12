@@ -56,7 +56,6 @@ from database import (
     make_engine,
     unique_slug,
 )
-import forward
 import settings
 from auth import auth_enabled, configure_auth, github_status, logged_in, password_status
 from pages import PAGES
@@ -440,7 +439,6 @@ def _open_app(mode, data_dir=None, games_dir=None):
             "admin": mode == "admin",
             "site": settings.site(),
             "public_url": current_app.config["PUBLIC_URL"],
-            "public_view_url": forward.public_view_url(current_app.config["PUBLIC_URL"]),
             "auth_enabled": mode == "admin" and auth_enabled(),
             "logged_in": mode == "admin" and logged_in(),
         }
@@ -588,8 +586,6 @@ def _open_app(mode, data_dir=None, games_dir=None):
     if mode == "admin":
         _configure_admin(app)
         _migrate_game_files(app)
-    else:
-        forward.configure_public(app)
     return app
 
 
@@ -642,7 +638,6 @@ def _client_game(game):
 
 def _configure_admin(app):
     configure_auth(app, Path(app.config["DATABASE_PATH"]).parent)
-    forward.configure_admin(app)
 
     @app.after_request
     def admin_security_headers(response):
@@ -681,7 +676,6 @@ def _configure_admin(app):
             default_title=current_app.config["TITLE"],
             password=password_status(),
             github=github_status(),
-            public_base=forward.public_base(current_app.config["PUBLIC_URL"]),
         )
 
     @app.put("/api/settings")
@@ -692,6 +686,19 @@ def _configure_admin(app):
             return jsonify(error=str(error)), 400
         settings.put(values)
         return jsonify(status="saved")
+
+    @app.post("/api/admin-address")
+    def save_admin_address():
+        """Remember where admin is, for the "Admin" link on the public site. admin.js calls this when the
+        address it is opened on differs from the saved one. The address comes from the browser's Origin
+        header, which the request guard has already checked against this site."""
+        origin = request.headers.get("Origin", "")
+        parsed = urlparse(origin)
+        if parsed.scheme not in ("http", "https") or not parsed.netloc or origin != f"{parsed.scheme}://{parsed.netloc}":
+            return jsonify(error="Nettleseren sendte ikke adressen til admin."), 400
+        if settings.get(settings.ADMIN_ADDRESS) != origin:
+            settings.put({settings.ADMIN_ADDRESS: origin})
+        return jsonify(admin_address=settings.admin_address())
 
     @app.post("/api/settings/logo")
     def upload_logo():

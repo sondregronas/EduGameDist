@@ -2,6 +2,11 @@
 
 Login is required as soon as one of them is set up. Changing who can sign in needs the admin password,
 unless the change is made by a GitHub user who is allowed to sign in.
+
+Two environment variables override Settings, e.g. to get back in:
+- FORCE_PASSWORD_LOGIN: logging in with the password is always allowed.
+- FORCE_ENV_PASSWORD: only ADMIN_PASSWORD is used; a password saved under Settings is ignored and the
+  password cannot be changed there.
 """
 import hashlib
 import hmac
@@ -23,6 +28,8 @@ MAX_FAILURES = 5
 LOCKOUT_SECONDS = 300
 SESSION_DAYS = 7
 PASSWORD_SETTING = "admin_password_hash"
+# "off" turns password login off, which is only possible (and only lasts) while GitHub login works.
+PASSWORD_LOGIN_SETTING = "password_login"
 MIN_PASSWORD_LENGTH = 8
 MAX_PASSWORD_LENGTH = 1000
 # A signed-in GitHub user can replace the admin password without knowing it by typing this word.
@@ -59,9 +66,14 @@ def _safe_next(value):
     return value
 
 
+def _flag(name):
+    return os.environ.get(name, "").strip().lower() in ("1", "true", "yes", "on")
+
+
 def active_password():
-    """The password in use: one saved under Settings wins over ADMIN_PASSWORD. Returns (source, secret)."""
-    stored = settings.get(PASSWORD_SETTING)
+    """The password in use: one saved under Settings wins over ADMIN_PASSWORD, unless FORCE_ENV_PASSWORD
+    is set. Returns (source, secret)."""
+    stored = None if current_app.config.get("FORCE_ENV_PASSWORD") else settings.get(PASSWORD_SETTING)
     if stored:
         return "stored", stored
     configured = current_app.config.get("ADMIN_PASSWORD", "")
@@ -97,9 +109,23 @@ def auth_enabled():
     return active_password()[0] is not None or github.active()
 
 
+def password_login_allowed():
+    """Whether the password can be used to log in. It can be turned off under Settings, but is always on
+    with FORCE_PASSWORD_LOGIN, and comes back on by itself when GitHub login is not set up, so nobody
+    is locked out."""
+    if active_password()[0] is None:
+        return False
+    if current_app.config.get("FORCE_PASSWORD_LOGIN"):
+        return True
+    return settings.get(PASSWORD_LOGIN_SETTING) != "off" or not github.active()
+
+
 def _password_session():
     source, secret = active_password()
-    return bool(source) and hmac.compare_digest(str(session.get("auth", "")), _fingerprint(source, secret))
+    return (
+        password_login_allowed()
+        and hmac.compare_digest(str(session.get("auth", "")), _fingerprint(source, secret))
+    )
 
 
 def github_user():
@@ -122,6 +148,11 @@ def password_status():
         "github_session": user is not None,
         "github_active": github.active(),
         "reset_word": RESET_WORD,
+        "login_allowed": password_login_allowed(),
+        "login_setting": settings.get(PASSWORD_LOGIN_SETTING) != "off",
+        "force_login": bool(current_app.config.get("FORCE_PASSWORD_LOGIN")),
+        "force_env": bool(current_app.config.get("FORCE_ENV_PASSWORD")),
+        "stored_ignored": bool(current_app.config.get("FORCE_ENV_PASSWORD") and settings.get(PASSWORD_SETTING)),
     }
 
 
@@ -209,6 +240,8 @@ def configure_auth(app, data_dir):
         SESSION_COOKIE_SAMESITE="Lax",
         SESSION_COOKIE_NAME="edugame_admin",
         PERMANENT_SESSION_LIFETIME=timedelta(days=SESSION_DAYS),
+        FORCE_PASSWORD_LOGIN=_flag("FORCE_PASSWORD_LOGIN"),
+        FORCE_ENV_PASSWORD=_flag("FORCE_ENV_PASSWORD"),
     )
 
     @app.context_processor
@@ -229,7 +262,7 @@ def configure_auth(app, data_dir):
             title="Logg inn",
             error=error,
             next=target,
-            password_login=active_password()[0] is not None,
+            password_login=password_login_allowed(),
             github_login=github.active(),
         ), status
 
@@ -241,8 +274,8 @@ def configure_auth(app, data_dir):
         if request.method == "GET":
             return login_page(target)
         source, secret = active_password()
-        if not source:
-            return login_page(target, "Innlogging med passord er ikke slått på. Logg inn med GitHub.", 400)
+        if not password_login_allowed():
+            return login_page(target, "Innlogging med passord er slått av. Logg inn med GitHub.", 400)
         if _locked():
             return login_page(target, LOCKED, 429)
         if not _matches(request.form.get("password", ""), source, secret):
@@ -295,10 +328,15 @@ def configure_auth(app, data_dir):
         session.clear()
         return redirect(url_for("login"))
 
+    def env_password_only():
+        if current_app.config["FORCE_ENV_PASSWORD"]:
+            return jsonify(error="Passordet styres av ADMIN_PASSWORD, fordi FORCE_ENV_PASSWORD er slått på."), 400
+        return None
+
     @app.post("/api/settings/password")
     def change_password():
         body = request.get_json(silent=True) or {}
-        problem = _authorize_password_change(body)
+        problem = env_password_only() or _authorize_password_change(body)
         if problem:
             return problem
         password = str(body.get("password", ""))
@@ -313,6 +351,9 @@ def configure_auth(app, data_dir):
 
     @app.delete("/api/settings/password")
     def remove_password():
+        problem = env_password_only()
+        if problem:
+            return problem
         if active_password()[0] != "stored":
             return jsonify(error="Det finnes ikke noe lagret passord."), 400
         problem = _authorize_password_change(request.get_json(silent=True) or {})
@@ -322,6 +363,24 @@ def configure_auth(app, data_dir):
         g.db.commit()
         _after_password_change()
         return jsonify(source=active_password()[0], login_required=auth_enabled())
+
+    @app.put("/api/settings/password-login")
+    def set_password_login():
+        body = request.get_json(silent=True) or {}
+        enabled = body.get("enabled")
+        if not isinstance(enabled, bool):
+            return jsonify(error="Velg av eller på."), 400
+        if current_app.config["FORCE_PASSWORD_LOGIN"]:
+            return jsonify(error="Innlogging med passord er alltid på, fordi FORCE_PASSWORD_LOGIN er satt."), 400
+        # Only someone who has just logged in with GitHub can turn the password off, so it is known to work.
+        if not enabled and not github_user():
+            return jsonify(error="Logg inn med GitHub før du slår av innlogging med passord, så du vet at GitHub-innloggingen virker."), 403
+        problem = _authorize_access_change(body)
+        if problem:
+            return problem
+        settings.put({PASSWORD_LOGIN_SETTING: None if enabled else "off"})
+        g.db.commit()
+        return jsonify(password_status())
 
     @app.put("/api/settings/github")
     def save_github():

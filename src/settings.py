@@ -14,7 +14,10 @@ BUILTIN_NAV = {
     "games": {"label": "Spill", "href": "/", "icon": "gamepad"},
     "install": {"label": "Installasjon", "href": "/install", "icon": "book"},
     "terms": {"label": "Vilkår", "href": "/vilkar", "icon": "shield"},
+    # Shown on the public site only. Its address is the one admin was last opened on (see admin_address()).
+    "admin": {"label": "Admin", "href": "", "icon": "lock"},
 }
+ADMIN_ADDRESS = "admin_origin"
 # Icons a custom menu link can have; the settings page cycles through them in this order.
 NAV_ICONS = (
     "link", "external", "home", "school", "book", "clipboard", "email", "message", "calendar",
@@ -84,8 +87,15 @@ def site():
             "logo_url": f"/logo/{logo}" if logo else "",
             "favicon_url": f"/logo/{logo}" if logo else "/assets/img/favicon.ico",
             "nav": nav_items(stored.get("nav")),
+            "admin_address": admin_address(),
         }
     return g.site
+
+
+def admin_address():
+    """Where admin is, as admin.js last reported it (e.g. https://admin.example.com/), or ""."""
+    origin = get(ADMIN_ADDRESS)
+    return f"{origin}/" if origin else ""
 
 
 def page_content(name):
@@ -98,7 +108,7 @@ def _builtin_item(key, label="", hidden=False):
         "key": key,
         "label": label,
         "text": label or builtin["label"],
-        "href": builtin["href"],
+        "href": admin_address() if key == "admin" else builtin["href"],
         "icon": builtin["icon"],
         "hidden": hidden,
         "new_tab": False,
@@ -206,7 +216,7 @@ def editor_data():
             {key: item[key] for key in ("key", "label", "hidden", "url", "new_tab", "icon") if key in item}
             for item in current["nav"]
         ],
-        "builtins": BUILTIN_NAV,
+        "builtins": {key: {**item, "href": admin_address() if key == "admin" else item["href"]} for key, item in BUILTIN_NAV.items()},
         "nav_icons": NAV_ICONS,
         "pages": {
             name: {"content": stored.get(key, ""), "default": PAGES[name]["default"]}

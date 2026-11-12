@@ -535,46 +535,28 @@ class EduGameDistAppTests(unittest.TestCase):
         self.assertIn('name="category-match" value="all"', page)
         self.assertNotRegex(page, r'id="platform-menu"[^>]*aria-multiselectable')
 
-    def test_browsers_that_used_admin_are_sent_from_the_public_site_to_admin(self):
-        _game_id, slug = self.create_game()
-        self.assertEqual(self.public_client.get("/").status_code, 200)
-        self.assertEqual(self.admin_client.post("/api/public-forward", json={}).status_code, 400)
-        self.assertEqual(self.admin_client.post("/api/public-forward", json={}, headers={"Origin": "https://evil.example"}).status_code, 403)
-        links = self.admin_client.post("/api/public-forward", json={"back": f"/{slug}?edit=1"}, headers={"Origin": "http://localhost"}).json
-        on, off = urlparse(links["on"]), urlparse(links["off"])
-        self.assertEqual((on.path, links["health"]), ("/admin-forward", "http://localhost/health"))
-        self.assertTrue(links["same_site"])  # PUBLIC_URL is left at its default in the tests
-
-        # A made-up token does nothing, and the link can only send the browser back to admin.
-        self.assertEqual(self.public_client.get("/admin-forward?token=wrong&back=/").headers["Location"], "/")
-        self.assertEqual(self.public_client.get("/").status_code, 200)
-        token = parse_qs(on.query)["token"][0]
-        escape = self.public.test_client().get(f"/admin-forward?token={token}&back=//evil.example/")
-        self.assertEqual(escape.headers["Location"], "http://localhost/")
-
-        handoff = self.public_client.get(f"{on.path}?{on.query}")
-        self.assertEqual(handoff.headers["Location"], f"http://localhost/{slug}?edit=1")
-        self.assertIn(f"Max-Age={400 * 24 * 60 * 60}", handoff.headers["Set-Cookie"])
-        self.assertEqual(handoff.headers["Referrer-Policy"], "no-referrer")
-        page = self.public_client.get("/?category=puzzle&category=co-op")
-        self.assertEqual((page.status_code, page.headers["Location"]), (302, "http://localhost/?category=puzzle&category=co-op"))
-        self.assertEqual(self.public_client.get(f"/{slug}").headers["Location"], f"http://localhost/{slug}")
-        self.assertEqual(self.public_client.get("/install").status_code, 302)
-        self.assertEqual(self.public_client.get("/health").status_code, 200)
-        with self.public_client.get("/assets/css/app.css") as asset:
-            self.assertEqual(asset.status_code, 200)
-
-        # "Åpne nettsiden" in admin shows the public site for a while instead.
-        self.assertIn('href="http://localhost/?public=1"', self.admin_client.get("/").get_data(as_text=True))
-        self.assertEqual(self.public_client.get("/?public=1").status_code, 200)
-        self.assertEqual(self.public_client.get(f"/{slug}").status_code, 200)
-
-        # Turning it off in a browser removes the cookie there.
-        other = self.public.test_client()
-        other.get(f"{on.path}?{on.query}")
-        self.assertEqual(other.get("/").status_code, 302)
-        self.assertEqual(other.get(f"{off.path}?{off.query}").headers["Location"], f"http://localhost/{slug}?edit=1")
-        self.assertEqual(other.get("/").status_code, 200)
+    def test_public_site_links_to_admin_once_admin_has_reported_its_address(self):
+        nav = lambda client: client.get("/").get_data(as_text=True).split('class="site-nav"')[1].split("</nav>")[0]
+        self.assertNotIn('title="Admin"', nav(self.public_client))
+        self.assertEqual(self.admin_client.post("/api/admin-address").status_code, 400)
+        self.assertEqual(self.admin_client.post("/api/admin-address", headers={"Origin": "https://evil.example"}).status_code, 403)
+        saved = self.admin_client.post("/api/admin-address", headers={"Origin": "http://localhost"})
+        self.assertEqual((saved.status_code, saved.json["admin_address"]), (200, "http://localhost/"))
+        public_nav = nav(self.public_client)
+        self.assertIn('<a href="http://localhost/" title="Admin">', public_nav)
+        self.assertIn("icons.svg#lock", public_nav)
+        # Admin has its own menu, so the link is only on the public site.
+        admin_page = self.admin_client.get("/").get_data(as_text=True)
+        self.assertNotIn('title="Admin"', admin_page.split('class="site-nav"')[1].split("</nav>")[0])
+        self.assertIn('data-admin-address="http://localhost/"', admin_page)
+        # It is a built-in menu item, so it can be renamed, moved and hidden like the others.
+        menu = [{"key": "admin", "label": "Lærere", "hidden": False}, {"key": "games", "label": "", "hidden": False}]
+        self.assertEqual(self.admin_client.put("/api/settings", json={"nav": menu}).status_code, 200)
+        public_nav = nav(self.public_client)
+        self.assertLess(public_nav.index("Lærere"), public_nav.index('href="/"'))
+        menu[0]["hidden"] = True
+        self.admin_client.put("/api/settings", json={"nav": menu})
+        self.assertNotIn("http://localhost/", nav(self.public_client))
 
     def test_games_can_be_pinned_as_this_weeks_game_until_a_day(self):
         thursday = date(2026, 11, 12)
@@ -1041,8 +1023,8 @@ class GitHubLoginTests(unittest.TestCase):
         self.app = self.make_app("hemmelig")
         self.client = self.app.test_client()
 
-    def make_app(self, password, name="data"):
-        with mock.patch.dict(os.environ, {"ADMIN_PASSWORD": password, "SECRET_KEY": ""}):
+    def make_app(self, password, name="data", **env):
+        with mock.patch.dict(os.environ, {"ADMIN_PASSWORD": password, "SECRET_KEY": "", "FORCE_PASSWORD_LOGIN": "", "FORCE_ENV_PASSWORD": "", **env}):
             app = create_admin_app(Path(self.temp_dir.name) / name, Path(self.temp_dir.name) / "games")
         self.addCleanup(app.extensions["database_engine"].dispose)
         return app
@@ -1202,6 +1184,63 @@ class GitHubLoginTests(unittest.TestCase):
         self.assertEqual(app.test_client().post("/login", data={"password": "langt-passord"}).status_code, 302)
         self.assertEqual(owner.delete("/api/settings/github", json={}).status_code, 200)
         self.assertEqual(owner.get("/api/games").status_code, 401)
+
+    def test_password_login_can_be_turned_off_by_a_github_user(self):
+        owner = self.app.test_client()
+        owner.post("/login", data={"password": "hemmelig"})
+        self.setup_github(owner)
+        turn = lambda client, enabled, **body: client.put("/api/settings/password-login", json={"enabled": enabled, **body})
+        self.assertEqual(turn(owner, "off", current="hemmelig").status_code, 400)
+        # Only someone who has logged in with GitHub can turn the password off.
+        self.assertEqual(turn(owner, False, current="hemmelig").status_code, 403)
+        member = self.app.test_client()
+        self.github_sign_in(member, OCTOCAT)
+        self.assertIn('id="password-login" checked>', member.get("/settings").get_data(as_text=True))
+        response = turn(member, False)
+        self.assertEqual((response.status_code, response.json["login_allowed"]), (200, False))
+        self.assertEqual(owner.get("/api/games").status_code, 401)
+        stranger = self.app.test_client()
+        login = stranger.get("/login").get_data(as_text=True)
+        self.assertNotIn('name="password"', login)
+        self.assertIn("Logg inn med GitHub", login)
+        self.assertEqual(stranger.post("/login", data={"password": "hemmelig"}).status_code, 400)
+        self.assertEqual(member.get("/api/games").status_code, 200)
+
+        # Without a working GitHub login, the password works again by itself.
+        self.assertEqual(member.delete("/api/settings/github", json={}).status_code, 200)
+        self.assertEqual(stranger.post("/login", data={"password": "hemmelig"}).status_code, 302)
+        self.assertEqual(stranger.get("/api/games").status_code, 200)
+        self.assertIn("på likevel fordi GitHub-innloggingen ikke er satt opp", stranger.get("/settings").get_data(as_text=True))
+        self.assertEqual(turn(stranger, True, current="hemmelig").status_code, 200)
+
+    def test_force_password_login_keeps_the_password_on(self):
+        app = self.make_app("hemmelig", name="forced", FORCE_PASSWORD_LOGIN="true")
+        owner = app.test_client()
+        owner.post("/login", data={"password": "hemmelig"})
+        self.setup_github(owner)
+        member = app.test_client()
+        self.github_sign_in(member, OCTOCAT)
+        self.assertEqual(member.put("/api/settings/password-login", json={"enabled": False}).status_code, 400)
+        # Even if it was turned off before the variable was set.
+        with Session(app.extensions["database_engine"]) as session:
+            session.merge(Setting(key="password_login", value="off"))
+            session.commit()
+        self.assertEqual(app.test_client().post("/login", data={"password": "hemmelig"}).status_code, 302)
+        self.assertIn("FORCE_PASSWORD_LOGIN", member.get("/settings").get_data(as_text=True))
+
+    def test_force_env_password_ignores_and_locks_the_saved_password(self):
+        self.client.post("/login", data={"password": "hemmelig"})
+        self.assertEqual(self.client.post("/api/settings/password", json={"current": "hemmelig", "password": "lagret-passord"}).status_code, 200)
+        app = self.make_app("hemmelig", FORCE_ENV_PASSWORD="1")
+        client = app.test_client()
+        self.assertEqual(client.post("/login", data={"password": "lagret-passord"}).status_code, 401)
+        self.assertEqual(client.post("/login", data={"password": "hemmelig"}).status_code, 302)
+        self.assertEqual(client.post("/api/settings/password", json={"current": "hemmelig", "password": "nytt-passord"}).status_code, 400)
+        self.assertEqual(client.delete("/api/settings/password", json={"current": "hemmelig"}).status_code, 400)
+        page = client.get("/settings").get_data(as_text=True)
+        self.assertIn("FORCE_ENV_PASSWORD", page)
+        self.assertIn("brukes ikke så lenge variabelen er satt", page)
+        self.assertNotIn('id="password-form"', page)
 
     def test_login_normalization(self):
         for value, expected in (("octocat", "octocat"), ("@Octo-Cat", "Octo-Cat"), ("https://github.com/octocat/", "octocat"), ("https://www.github.com/a-b?tab=repos", "a-b")):
