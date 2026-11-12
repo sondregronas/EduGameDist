@@ -11,10 +11,13 @@ This is a living overview of what has been done and what might come. Suggestions
 - Teacher notes with links and simple HTML.
 - Game files are stored under their own names in `games/<Platform>/<game>/`, and older uploads are migrated automatically.
 - Site settings in admin: title, logo/favicon, front page text, menu links in any order, the installation guide and terms pages, and the admin password.
-- Hiding games from visitors, and filtering by category and platform.
+- Hiding games from visitors, and filtering by category (one or several) and platform.
+- GitHub login for admin for chosen GitHub users, set up under Settings.
+- "Ukens spill": games pinned to the top of the front page for a week or until a chosen day.
+- Browsers that have used admin are sent from the public site straight to admin.
 
 ## Possible improvements
-- **Users and roles:** several administrators, and possibly access to some games for some users. Admin is currently protected by one shared password and/or the proxy in front of it.
+- **Users and roles:** roles beyond "admin", and possibly access to some games for some users. Admin is currently protected by one shared password, GitHub login for chosen users and/or the proxy in front of it.
 - **Resumable uploads:** large files are sent in one request, so an interrupted upload must start over.
 - **More metadata sources:** for example [TheGamesDB](https://thegamesdb.net/) for games that are not on Steam.
 - **Better support for large games:** for example checksums and download options per file.

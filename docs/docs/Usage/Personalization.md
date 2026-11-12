@@ -52,8 +52,8 @@ The list also shows how many games use each category. Categories can also be cre
 
 Visitors can switch between dark and light mode with the switch at the top right, and the choice is remembered in their browser. Until they choose, the site follows their system setting: light when the device is set to light mode, otherwise dark. The colours are CSS variables at the top of `src/public/css/app.css`; light mode only overrides those.
 
-## Password
+## Password and GitHub login
 
-See [Restricting access](../Installation/Access.md#logging-in-with-a-password).
+See [Restricting access](../Installation/Access.md#logging-in-with-a-password) for the password, [GitHub login](../Installation/Access.md#logging-in-with-github) and the [shortcut from the public site to admin](../Installation/Access.md#shortcut-from-the-public-site-to-admin).
 
 Feel free to contribute changes you make to the frontend with a pull request on the [GitHub repository](https://github.com/sondregronas/EduGameDist).

@@ -9,4 +9,5 @@ Open the admin address to add or edit games. Changes become visible on the publi
 From the admin front page you can also:
 
 - hide or show a game for visitors with the eye icon on its cover (see [Modifying games](../Usage/Modifying-games.md)),
-- open **Innstillinger** (Settings) in the menu to change the title, logo, front page, menu, pages and password (see [Personalization](../Usage/Personalization.md)).
+- pin games as **Ukens spill** (this week's games) with the star on their cover (see [Modifying games](../Usage/Modifying-games.md#ukens-spill-this-weeks-games)),
+- open **Innstillinger** (Settings) in the menu to change the title, logo, front page, menu, pages, password and GitHub login (see [Personalization](../Usage/Personalization.md) and [Restricting access](Access.md)).

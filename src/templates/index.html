@@ -1,5 +1,5 @@
 {% extends "base.html" %}
-{% from "_macros.html" import icon %}
+{% from "_macros.html" import icon, star_button, feature_dialog %}
 {% block head %}
   <meta property="og:title" content="{{ site.title }}">
   <meta property="og:type" content="website">
@@ -12,22 +12,65 @@
     {% if site.hero_text %}<div class="hero-text">{{ site.hero_text|rich_text }}</div>{% endif %}
   </section>
 
+  {% if featured %}
+    <section class="spotlight{% if featured|length == 1 %} is-single{% endif %}" aria-labelledby="spotlight-title">
+      <header class="spotlight-head">
+        <h2 id="spotlight-title">{{ icon('star') }}Ukens spill</h2>
+        <span class="week-pill">Uke {{ week }}</span>
+      </header>
+      <div class="spotlight-grid">
+        {% for game in featured %}
+          <article class="spotlight-card{% if game.hidden %} is-concealed{% endif %}" style="--h: {{ game.title|hue }}">
+            <a class="spotlight-link" href="/{{ game.slug }}">
+              {% if game.cover %}<img class="spotlight-ambient" src="{{ game.cover }}" alt="" aria-hidden="true">{% endif %}
+              <div class="spotlight-cover">
+                {% if game.cover %}<img src="{{ game.cover }}" alt="" width="460" height="215">
+                {% else %}<div class="cover-placeholder">{{ icon('gamepad') }}</div>{% endif %}
+                <span class="spotlight-ribbon">{{ icon('star') }}Ukens spill</span>
+              </div>
+              <div class="spotlight-body">
+                <h3>{{ game.title }}</h3>
+                {% if game.featured.note %}
+                  <p class="spotlight-note">{{ icon('message') }}<span>{{ game.featured.note }}</span></p>
+                {% elif game.description %}
+                  <p class="spotlight-text">{{ game.description|truncate(220) }}</p>
+                {% endif %}
+                <div class="spotlight-meta">
+                  {% if game.players %}<span class="chip">{{ icon('user' if game.players == '1' else 'users') }}{{ game.players }}</span>{% endif %}
+                  {% if game.ttb %}<span class="chip">{{ icon('clock') }}{{ game.ttb }}</span>{% endif %}
+                  <span class="card-platforms" aria-label="Plattformer">{% for platform in game.platforms %}<span title="{{ platform|capitalize }}">{{ icon(platform) }}</span>{% endfor %}</span>
+                </div>
+                {% if admin %}<p class="spotlight-until">{{ icon('calendar') }}{{ ('Til og med ' ~ game.featured.until_text) if game.featured.until_text else 'Uten sluttdato' }}{% if game.hidden %} · skjult for besøkende{% endif %}</p>{% endif %}
+                <span class="spotlight-cta">Se spillet{{ icon('back', 'flip') }}</span>
+              </div>
+            </a>
+            {% if admin %}{{ star_button(game) }}{% endif %}
+          </article>
+        {% endfor %}
+      </div>
+    </section>
+  {% endif %}
+
   <div class="toolbar" id="filter">
     <label class="search-box">
       {{ icon('search') }}
       <input type="search" id="search" placeholder="Søk etter spill" aria-label="Søk etter spill" autocomplete="off">
     </label>
     {% if categories %}
-      <div class="dropdown" id="category-filter">
+      <div class="dropdown" id="category-filter" data-multiple>
         <button type="button" class="dropdown-button" aria-haspopup="listbox" aria-expanded="false" aria-controls="category-menu">
-          <span class="visually-hidden">Kategori: </span><span class="dropdown-value">{{ icon('tag') }}<span class="menu-text">Alle kategorier</span></span>{{ icon('chevron-down', 'dropdown-caret') }}
+          <span class="visually-hidden">Kategorier: </span><span class="dropdown-value">{{ icon('tag') }}<span class="menu-text">Alle kategorier</span></span>{{ icon('chevron-down', 'dropdown-caret') }}
         </button>
-        <ul class="menu" id="category-menu" role="listbox" tabindex="-1" aria-label="Kategori" hidden>
+        <ul class="menu menu-multi" id="category-menu" role="listbox" tabindex="-1" aria-label="Kategorier (velg én eller flere)" aria-multiselectable="true" hidden>
           <li class="menu-option" role="option" data-value="" aria-selected="true">{{ icon('tag') }}<span class="menu-text">Alle kategorier</span>{{ icon('check', 'menu-check') }}</li>
           {% for name, count in categories %}
             <li class="menu-option" role="option" data-value="{{ name|lower }}" aria-selected="false"><span class="menu-dot" style="--h: {{ name|hue }}"></span><span class="menu-text">{{ name }}</span><span class="menu-count">{{ count }}</span>{{ icon('check', 'menu-check') }}</li>
           {% endfor %}
         </ul>
+      </div>
+      <div class="match-toggle" id="category-match" role="radiogroup" aria-label="Vis spill som har" hidden>
+        <label title="Vis spill som har minst én av kategoriene"><input type="radio" name="category-match" value="any" checked><span>Minst én</span></label>
+        <label title="Vis bare spill som har alle kategoriene"><input type="radio" name="category-match" value="all"><span>Alle</span></label>
       </div>
     {% endif %}
     {% if platforms %}
@@ -43,6 +86,7 @@
         </ul>
       </div>
     {% endif %}
+    <button type="button" class="btn btn-small btn-ghost" id="clear-filters" hidden>{{ icon('close') }}Nullstill</button>
     {% if admin %}<button type="button" class="btn btn-small btn-ghost" id="edit-categories">{{ icon('tag') }}Kategorier</button>{% endif %}
     <span class="result-count" id="result-count" aria-live="polite"></span>
   </div>
@@ -75,7 +119,7 @@
       </button>
     {% endif %}
     {% for game in games %}
-      <article class="game-card{% if game.hidden %} is-concealed{% endif %}"
+      <article class="game-card{% if game.hidden %} is-concealed{% endif %}{% if game.featured %} is-featured{% endif %}"
          data-title="{{ game.title|lower }}"
          data-categories="{{ game.category|join('|')|lower }}"
          data-platforms="{{ game.platforms|join(' ') }}"{% if admin %}
@@ -85,6 +129,7 @@
             {% if game.cover %}<img src="{{ game.cover }}" alt="" loading="lazy" width="460" height="215">
             {% else %}<div class="cover-placeholder">{{ icon('gamepad') }}</div>{% endif %}
             <div class="card-badges">
+              {% if game.featured %}<span class="badge badge-star" title="Ukens spill">{{ icon('star') }}<span class="visually-hidden">Ukens spill</span></span>{% endif %}
               {% if game.players %}<span class="badge">{{ icon('user' if game.players == '1' else 'users') }}{{ game.players }}</span>{% endif %}
               {% if game.ttb %}<span class="badge">{{ icon('clock') }}{{ game.ttb }}</span>{% endif %}
             </div>
@@ -102,6 +147,7 @@
           </div>
         </a>
         {% if admin %}
+          {{ star_button(game) }}
           <button type="button" class="card-eye" aria-pressed="{{ 'true' if game.hidden else 'false' }}"
                   title="{{ 'Skjult for besøkende. Klikk for å vise spillet.' if game.hidden else 'Synlig for besøkende. Klikk for å skjule spillet.' }}"
                   aria-label="{{ ('Vis ' if game.hidden else 'Skjul ') ~ game.title }}">{{ icon('eye-off' if game.hidden else 'eye') }}</button>
@@ -150,5 +196,6 @@
       </div>
     </dialog>
     <script type="application/json" id="category-data">{{ category_inventory|tojson }}</script>
+    {{ feature_dialog(feature_options) }}
   {% endif %}
 {% endblock %}

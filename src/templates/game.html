@@ -1,5 +1,5 @@
 {% extends "base.html" %}
-{% from "_macros.html" import icon %}
+{% from "_macros.html" import icon, star_button, feature_dialog %}
 {% block head %}
   <meta name="description" content="{{ game.description }}">
   <meta property="og:title" content="{{ game.title }}">
@@ -15,6 +15,7 @@
     <a class="back-link" href="/">{{ icon('back') }}Alle spill</a>
     {% if admin %}
       <div class="crumb-actions">
+        {{ star_button(game, 'btn feature-toggle', label=True) }}
         <button type="button" class="btn" id="visibility-toggle" aria-pressed="{{ 'true' if game.hidden else 'false' }}">{{ icon('eye-off' if game.hidden else 'eye') }}{{ 'Skjult' if game.hidden else 'Synlig' }}</button>
         <button type="button" class="btn btn-primary" id="edit-toggle">{{ icon('edit') }}Rediger</button>
       </div>
@@ -40,6 +41,7 @@
     </div>
 
     <div class="game-info">
+      {% if game.featured %}<a class="featured-chip view-only" href="/">{{ icon('star') }}Ukens spill</a>{% endif %}
       <h1 class="game-title view-only">{{ game.title }}</h1>
       {% if admin %}<input class="ghost ghost-title edit-only" data-field="title" value="{{ game.title }}" maxlength="250" placeholder="Tittel" aria-label="Tittel">{% endif %}
 
@@ -71,6 +73,7 @@
         {% endif %}
       </div>
 
+      {% if game.featured and game.featured.note %}<div class="callout callout-star view-only">{{ icon('star') }}<div class="callout-text"><b>Hvorfor ukens spill?</b> {{ game.featured.note }}</div></div>{% endif %}
       {% if game.note %}<div class="callout view-only">{{ icon('info') }}<div class="callout-text">{{ game.note|rich_text }}</div></div>{% endif %}
       {% if admin %}
         <label class="field edit-only"><span>Merknad som vises på spillsiden (f.eks. tips til lærere). Linjeskift vises som de er. Lenker (&lt;a href&gt;), &lt;b&gt;, &lt;i&gt;, &lt;ul&gt; og &lt;li&gt; støttes.</span>
@@ -183,6 +186,7 @@
       </div>
     </div>
     <script type="application/json" id="editor-data">{{ editor|tojson }}</script>
+    {{ feature_dialog(feature_options) }}
   {% endif %}
 </article>
 {% endblock %}
